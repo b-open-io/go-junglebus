@@ -26,4 +26,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+// Force all dependencies to use a newer version of x/net to avoid CVE-2024-45338
+// This is needed because github.com/planetscale/vtprotobuf pulls in an older vulnerable version
 replace golang.org/x/net => golang.org/x/net v0.34.0

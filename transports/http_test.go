@@ -67,7 +67,10 @@ func TestTransportHTTP_GetSubscriptionToken(t *testing.T) {
 		assert.Equal(t, "test-sub", reqBody[FieldSubscriptionID])
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(LoginResponse{Token: "test-token"})
+		if err := json.NewEncoder(w).Encode(LoginResponse{Token: "test-token"}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -88,7 +91,10 @@ func TestTransportHTTP_RefreshToken(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(LoginResponse{Token: "new-token"})
+		if err := json.NewEncoder(w).Encode(LoginResponse{Token: "new-token"}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -118,9 +124,12 @@ func TestTransportHTTP_Login(t *testing.T) {
 		assert.Equal(t, "testpass", reqBody[FieldPassword])
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"token": "login-token",
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 

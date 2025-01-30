@@ -139,6 +139,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 	})
 }
 
+//nolint:unused // Mock client and methods for future test cases
 type mockCentrifugeClient struct {
 	onConnectingCalled   bool
 	onConnectedCalled    bool

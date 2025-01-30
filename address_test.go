@@ -29,6 +29,7 @@ func TestGetAddressTransactions(t *testing.T) {
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
+	//nolint:staticcheck // Intentionally testing nil context
 	_, err = client.GetAddressTransactions(nil, "test-address")
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
@@ -49,7 +50,11 @@ func TestGetAddressTransactions(t *testing.T) {
 				BlockIndex:    1,
 			},
 		}
-		json.NewEncoder(w).Encode(addresses)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(addresses); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -105,6 +110,7 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
+	//nolint:staticcheck // Intentionally testing nil context
 	_, err = client.GetAddressTransactionDetails(nil, "test-address")
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())

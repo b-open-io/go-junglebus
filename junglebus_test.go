@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:unused // These constants and helpers are kept for future test cases
 const (
 	requestTypeHTTP = "http"
 	serverURL       = "junglebus.gorillapool.io" // Removed https:// prefix
@@ -30,6 +31,7 @@ func (l localRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return w.Result(), nil
 }
 
+//nolint:unused // Helper function for writing test data
 func mustWrite(w io.Writer, s string) {
 	_, err := io.WriteString(w, s)
 	if err != nil {
@@ -37,6 +39,7 @@ func mustWrite(w io.Writer, s string) {
 	}
 }
 
+//nolint:unused // Test transport handler types for future test cases
 type testTransportHandler struct {
 	ClientURL string
 	Client    func(serverURL string, httpClient *http.Client) ClientOps
@@ -103,6 +106,7 @@ func TestGetTransport(t *testing.T) {
 	})
 }
 
+//nolint:unused // Helper function for creating test clients
 func getTestClient(transportHandler testTransportHandler) *Client {
 	mux := http.NewServeMux()
 	if transportHandler.Queries != nil {

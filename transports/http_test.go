@@ -150,9 +150,12 @@ func TestTransportHTTP_GetTransaction(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&models.Transaction{
+		if err := json.NewEncoder(w).Encode(&models.Transaction{
 			ID: "test-tx",
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -173,9 +176,12 @@ func TestTransportHTTP_GetAddressTransactions(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]*models.Address{
+		if err := json.NewEncoder(w).Encode([]*models.Address{
 			{Address: "test-addr"},
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -197,9 +203,12 @@ func TestTransportHTTP_GetAddressTransactionDetails(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]*models.Transaction{
+		if err := json.NewEncoder(w).Encode([]*models.Transaction{
 			{ID: "test-tx"},
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -221,9 +230,12 @@ func TestTransportHTTP_GetBlockHeader(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&models.BlockHeader{
+		if err := json.NewEncoder(w).Encode(&models.BlockHeader{
 			Height: 123,
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -245,10 +257,13 @@ func TestTransportHTTP_GetBlockHeaders(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]*models.BlockHeader{
+		if err := json.NewEncoder(w).Encode([]*models.BlockHeader{
 			{Height: 123},
 			{Height: 124},
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	}))
 	defer ts.Close()
 

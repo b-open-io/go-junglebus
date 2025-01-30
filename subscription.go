@@ -108,7 +108,9 @@ func (s *Subscription) handlePubChan(options *SubscribeOptions) {
 }
 
 func (jb *Client) Unsubscribe() (err error) {
-	jb.subscription.Unsubscribe()
+	if err = jb.subscription.Unsubscribe(); err != nil {
+		return err
+	}
 	jb.subscription = nil
 	return nil
 }
@@ -190,7 +192,9 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 	centrifugeClient.OnConnecting(func(e centrifuge.ConnectingEvent) {
 		if jb.subscription != nil {
 			for _, sub := range jb.subscription.subscriptions {
-				sub.Unsubscribe()
+				if err := sub.Unsubscribe(); err != nil {
+					eventHandler.OnError(err)
+				}
 			}
 			jb.subscription.wg.Wait()
 			eventHandler.OnStatus(&models.ControlResponse{

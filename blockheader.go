@@ -2,16 +2,29 @@ package junglebus
 
 import (
 	"context"
+	"errors"
 
 	"github.com/GorillaPool/go-junglebus/models"
 )
 
-// GetBlockHeader get a block header from JungleBus
+// GetBlockHeader get the block header for the given block hash or height
 func (jb *Client) GetBlockHeader(ctx context.Context, block string) (*models.BlockHeader, error) {
+	if ctx == nil {
+		return nil, errors.New("context cannot be nil")
+	}
+	if block == "" {
+		return nil, errors.New("block cannot be empty")
+	}
 	return jb.transport.GetBlockHeader(ctx, block)
 }
 
-// GetBlockHeaders get a list of block headers from JungleBus
-func (jb *Client) GetBlockHeaders(ctx context.Context, block string, limit uint) ([]*models.BlockHeader, error) {
-	return jb.transport.GetBlockHeaders(ctx, block, limit)
+// GetBlockHeaders get block headers starting from the given block hash or height
+func (jb *Client) GetBlockHeaders(ctx context.Context, fromBlock string, limit uint) ([]*models.BlockHeader, error) {
+	if ctx == nil {
+		return nil, errors.New("context cannot be nil")
+	}
+	if fromBlock == "" {
+		return nil, errors.New("fromBlock cannot be empty")
+	}
+	return jb.transport.GetBlockHeaders(ctx, fromBlock, limit)
 }

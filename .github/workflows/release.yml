@@ -2,9 +2,6 @@
 # From: https://goreleaser.com/ci/actions/#usage
 name: release
 
-env:
-  GO111MODULE: true
-
 on:
   push:
     tags:

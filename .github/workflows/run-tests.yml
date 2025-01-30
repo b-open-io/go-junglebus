@@ -34,7 +34,7 @@ jobs:
       - name: Run Nancy
         run: |
           go install github.com/sonatype-nexus-community/nancy@latest
-          go list -json -deps ./... | nancy sleuth
+          go list -json -m all | nancy sleuth
   test:
     needs: [yamllint, asknancy]
     strategy:

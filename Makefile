@@ -40,3 +40,9 @@ test-coverage-custom: ## Custom package test coverage
 update-contributors: ## Regenerates the contributors html/list
 	@echo "generating contributor html..."
 	@all-contributors generate
+
+godocs: ## Generate Go documentation
+	@echo "generating godocs..."
+	@go install golang.org/x/tools/cmd/godoc@latest
+	@echo "godoc server starting at http://localhost:6060"
+	@godoc -http=:6060

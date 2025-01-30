@@ -2,11 +2,15 @@
 # ---------------------------
 # General
 # ---------------------------
+version: 2
+
 before:
   hooks:
     - make all
+
 snapshot:
   name_template: "{{ .Tag }}"
+
 changelog:
   sort: asc
   filters:

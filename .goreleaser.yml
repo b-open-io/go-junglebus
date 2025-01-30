@@ -43,16 +43,6 @@ release:
 # Announce
 # ---------------------------
 announce:
-
-  # See more at: https://goreleaser.com/customization/announce/#slack
-  slack:
-    enabled: true
-    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Changelog: https://github.com/b-open-io/{{ .ProjectName }}/releases/tag/{{ .Tag }}'
-    channel: '#junglebus'
-    # username: ''
-    # icon_emoji: ''
-    # icon_url: ''
-
   # See more at: https://goreleaser.com/customization/announce/#twitter
   twitter:
     enabled: false

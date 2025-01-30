@@ -63,7 +63,7 @@ func TestNewJungleBusClient(t *testing.T) {
 // TestGetTransport will test the GetTransport method
 func TestGetTransport(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -110,7 +110,7 @@ func getTestClient(transportHandler testTransportHandler) *Client {
 			mux.HandleFunc(query.Path, query.Result)
 		}
 	} else {
-		mux.HandleFunc(transportHandler.Path, func(w http.ResponseWriter, req *http.Request) {
+		mux.HandleFunc(transportHandler.Path, func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			mustWrite(w, transportHandler.Result)
 		})

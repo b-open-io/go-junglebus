@@ -218,11 +218,15 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("token", h.token)
 
-	resp, err := h.httpClient.Do(req)
-	if err != nil {
+	var resp *http.Response
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	if resp, err = h.httpClient.Do(req); err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		return errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)

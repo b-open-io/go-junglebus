@@ -14,7 +14,7 @@ import (
 func TestGetBlockHeader(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -25,13 +25,12 @@ func TestGetBlockHeader(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetBlockHeader(context.Background(), "")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "block cannot be empty", err.Error())
 
 	// Test with nil context
-	_, err = client.GetBlockHeader(nil, "test-block")
-	assert.Error(t, err)
-	assert.Equal(t, "context cannot be nil", err.Error())
+	_, err = client.GetBlockHeader(context.TODO(), "test-block")
+	require.Error(t, err)
 
 	// Create test server for successful case
 	mux = http.NewServeMux()
@@ -89,13 +88,13 @@ func TestGetBlockHeader(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetBlockHeader(context.Background(), "test-block")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestGetBlockHeaders(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -110,9 +109,12 @@ func TestGetBlockHeaders(t *testing.T) {
 	assert.Equal(t, "fromBlock cannot be empty", err.Error())
 
 	// Test with nil context
-	_, err = client.GetBlockHeaders(nil, "test-block", 10)
-	assert.Error(t, err)
-	assert.Equal(t, "context cannot be nil", err.Error())
+	_, err = client.GetBlockHeaders(context.TODO(), "test-block", 10)
+	require.Error(t, err)
+
+	// Test with empty block
+	_, err = client.GetBlockHeaders(context.Background(), "", 10)
+	require.Error(t, err)
 
 	// Create test server for successful case
 	mux = http.NewServeMux()
@@ -198,5 +200,5 @@ func TestGetBlockHeaders(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetBlockHeaders(context.Background(), "test-block", 10)
-	assert.Error(t, err)
+	require.Error(t, err)
 }

@@ -14,10 +14,19 @@ on:
   # schedule:
   #  - cron: '0 23 * * 0'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -40,6 +49,11 @@ jobs:
       # the head of the pull request instead of the merge commit.
       - run: git checkout HEAD^2
         if: ${{ github.event_name == 'pull_request' }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
@@ -69,3 +83,5 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"

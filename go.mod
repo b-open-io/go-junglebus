@@ -1,6 +1,6 @@
 module github.com/b-open-io/go-junglebus
 
-go 1.22
+go 1.23
 
 require (
 	github.com/centrifugal/centrifuge-go v0.10.4

@@ -14,12 +14,13 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - name: Validate Secrets
+      - name: Validate OpenAI Key
         run: |
           if [ -z "${{ secrets.OPENAI_KEY }}" ]; then
-            echo "Required secrets are missing!" && exit 1;
+            echo "OPENAI_KEY secret is missing!" && exit 1;
           fi
       - name: Satchmodamus PR Agent
         uses: rohenaz/pr-agent@v0.0.1
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ github.token }} 

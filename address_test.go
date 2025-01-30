@@ -11,6 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// getNilContext is used for testing nil context cases
+//
+//nolint:staticcheck // Intentionally returns nil for testing
+func getNilContext() context.Context {
+	return nil
+}
+
 func TestGetAddressTransactions(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
@@ -29,8 +36,7 @@ func TestGetAddressTransactions(t *testing.T) {
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
-	//nolint:staticcheck // Intentionally testing nil context
-	_, err = client.GetAddressTransactions(nil, "test-address")
+	_, err = client.GetAddressTransactions(getNilContext(), "test-address")
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
@@ -50,11 +56,7 @@ func TestGetAddressTransactions(t *testing.T) {
 				BlockIndex:    1,
 			},
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(addresses); err != nil {
-			t.Error(err)
-			return
-		}
+		json.NewEncoder(w).Encode(addresses)
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -110,8 +112,7 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
-	//nolint:staticcheck // Intentionally testing nil context
-	_, err = client.GetAddressTransactionDetails(nil, "test-address")
+	_, err = client.GetAddressTransactionDetails(getNilContext(), "test-address")
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
@@ -142,11 +143,7 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 				MerkleProof: []byte("test-merkle-data-2"),
 			},
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(transactions); err != nil {
-			t.Error(err)
-			return
-		}
+		json.NewEncoder(w).Encode(transactions)
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 

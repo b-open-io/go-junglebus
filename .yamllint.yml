@@ -26,3 +26,5 @@ rules:
   indentation: disable
   braces: disable
   brackets: disable
+  key-duplicates: disable
+  key-ordering: disable

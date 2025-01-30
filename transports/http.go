@@ -90,6 +90,11 @@ func (h *TransportHTTP) SetVersion(version string) {
 	h.version = version
 }
 
+// GetVersion gets the version used for all calls
+func (h *TransportHTTP) GetVersion() string {
+	return h.version
+}
+
 // GetServerURL get the server URL for this transport
 func (h *TransportHTTP) GetServerURL() string {
 	return h.server
@@ -201,7 +206,6 @@ func (h *TransportHTTP) GetBlockHeaders(ctx context.Context, fromBlock string, l
 
 // doHTTPRequest will create and submit the HTTP request
 func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path string, rawJSON []byte, responseJSON interface{}) error {
-
 	protocol := "https"
 	if !h.useSSL {
 		protocol = "http"
@@ -214,18 +218,15 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("token", h.token)
 
-	var resp *http.Response
-	defer func() {
-		if resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
-	if resp, err = h.httpClient.Do(req); err != nil {
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode >= http.StatusBadRequest {
 		return errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(&responseJSON)
+	return json.NewDecoder(resp.Body).Decode(responseJSON)
 }

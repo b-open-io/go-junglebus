@@ -36,6 +36,7 @@ type TransportService interface {
 	RefreshToken(ctx context.Context) (string, error)
 	SetToken(token string)
 	SetVersion(version string)
+	GetVersion() string
 	UseSSL(useSSL bool)
 	IsSSL() bool
 	GetServerURL() string

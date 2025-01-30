@@ -14,6 +14,11 @@ jobs:
       pull-requests: write
       contents: write
     steps:
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.OPENAI_KEY }}" ] || [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "Required secrets are missing!" && exit 1;
+          fi
       - name: Satchmodamus PR Agent
         uses: rohenaz/pr-agent@v0.0.1
         env:

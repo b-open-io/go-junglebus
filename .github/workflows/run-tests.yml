@@ -3,7 +3,7 @@
 name: run-go-tests
 
 env:
-  GO111MODULE: "on"
+  GO111MODULE: true
 
 on:
   pull_request:

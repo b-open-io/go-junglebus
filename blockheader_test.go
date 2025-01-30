@@ -50,7 +50,11 @@ func TestGetBlockHeader(t *testing.T) {
 			Bits:       "1d00ffff",
 			Synced:     1,
 		}
-		json.NewEncoder(w).Encode(header)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(header); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -148,7 +152,11 @@ func TestGetBlockHeaders(t *testing.T) {
 				Synced:     1,
 			},
 		}
-		json.NewEncoder(w).Encode(headers)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(headers); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 

@@ -2,6 +2,7 @@ package junglebus
 
 import (
 	"context"
+	"log"
 
 	"github.com/b-open-io/go-junglebus/models"
 	"github.com/centrifugal/centrifuge-go"
@@ -53,5 +54,18 @@ type EventHandler struct {
 }
 
 func (e *EventHandler) OnPublish(event centrifuge.PublicationEvent) {
+	if e.debug {
+		log.Printf("[DEBUG] OnPublish event received: %+v", event)
+	}
 
+	// Use context for cancellation if needed
+	if e.ctx != nil && e.ctx.Err() != nil {
+		if e.OnError != nil {
+			e.OnError(e.ctx.Err())
+		}
+		return
+	}
+
+	// Process the event based on the data
+	// Implementation depends on the specific requirements
 }

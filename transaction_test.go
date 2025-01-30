@@ -48,7 +48,11 @@ func TestGetTransaction(t *testing.T) {
 			Transaction: []byte("test-tx-data"),
 			MerkleProof: []byte("test-merkle-data"),
 		}
-		json.NewEncoder(w).Encode(tx)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(tx); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -92,7 +96,11 @@ func TestGetTransaction_WithDebug(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/transaction/get/test-tx-id", func(w http.ResponseWriter, _ *http.Request) {
 		tx := &models.Transaction{ID: "test-tx-id"}
-		json.NewEncoder(w).Encode(tx)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(tx); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
 

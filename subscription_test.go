@@ -135,7 +135,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		close(sub.pubChan)
 		sub.wg.Wait()
 
-		assert.True(t, *onMempoolCalled)
+		require.True(t, *onMempoolCalled)
 	})
 }
 
@@ -154,65 +154,78 @@ type mockCentrifugeClient struct {
 	onLeaveCalled        bool
 }
 
+//nolint:unused // Mock client constructor for future test cases
 func newMockCentrifugeClient() *mockCentrifugeClient {
 	return &mockCentrifugeClient{}
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnConnecting(handler centrifuge.ConnectingHandler) {
 	m.onConnectingCalled = true
 	handler(centrifuge.ConnectingEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnConnected(handler centrifuge.ConnectedHandler) {
 	m.onConnectedCalled = true
 	handler(centrifuge.ConnectedEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnDisconnected(handler centrifuge.DisconnectHandler) {
 	m.onDisconnectedCalled = true
 	handler(centrifuge.DisconnectedEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnError(handler centrifuge.ErrorHandler) {
 	m.onErrorCalled = true
 	handler(centrifuge.ErrorEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnMessage(handler centrifuge.MessageHandler) {
 	m.onMessageCalled = true
 	handler(centrifuge.MessageEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnSubscribed(handler centrifuge.ServerSubscribedHandler) {
 	m.onSubscribedCalled = true
 	handler(centrifuge.ServerSubscribedEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnSubscribing(handler centrifuge.ServerSubscribingHandler) {
 	m.onSubscribingCalled = true
 	handler(centrifuge.ServerSubscribingEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnUnsubscribed(handler centrifuge.ServerUnsubscribedHandler) {
 	m.onUnsubscribedCalled = true
 	handler(centrifuge.ServerUnsubscribedEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnPublication(handler centrifuge.ServerPublicationHandler) {
 	m.onPublicationCalled = true
 	handler(centrifuge.ServerPublicationEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnJoin(handler centrifuge.ServerJoinHandler) {
 	m.onJoinCalled = true
 	handler(centrifuge.ServerJoinEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) OnLeave(handler centrifuge.ServerLeaveHandler) {
 	m.onLeaveCalled = true
 	handler(centrifuge.ServerLeaveEvent{})
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) NewSubscription(channel string, _ centrifuge.SubscriptionConfig) (*centrifuge.Subscription, error) {
 	if channel == "" {
 		return nil, fmt.Errorf("channel cannot be empty")
@@ -220,8 +233,65 @@ func (m *mockCentrifugeClient) NewSubscription(channel string, _ centrifuge.Subs
 	return &centrifuge.Subscription{}, nil
 }
 
+//nolint:unused // Mock client method for future test cases
 func (m *mockCentrifugeClient) Connect() error { return nil }
-func (m *mockCentrifugeClient) Close()         {}
+
+//nolint:unused // Mock client method for future test cases
+func (m *mockCentrifugeClient) Close() {}
+
+func TestMockCentrifugeClientHandlers(t *testing.T) {
+	mockClient := newMockCentrifugeClient()
+
+	// Test all handlers are called
+	mockClient.OnConnecting(func(e centrifuge.ConnectingEvent) {})
+	require.True(t, mockClient.onConnectingCalled)
+
+	mockClient.OnConnected(func(e centrifuge.ConnectedEvent) {})
+	require.True(t, mockClient.onConnectedCalled)
+
+	mockClient.OnDisconnected(func(e centrifuge.DisconnectedEvent) {})
+	require.True(t, mockClient.onDisconnectedCalled)
+
+	mockClient.OnError(func(e centrifuge.ErrorEvent) {})
+	require.True(t, mockClient.onErrorCalled)
+
+	mockClient.OnMessage(func(e centrifuge.MessageEvent) {})
+	require.True(t, mockClient.onMessageCalled)
+
+	mockClient.OnSubscribed(func(e centrifuge.ServerSubscribedEvent) {})
+	require.True(t, mockClient.onSubscribedCalled)
+
+	mockClient.OnSubscribing(func(e centrifuge.ServerSubscribingEvent) {})
+	require.True(t, mockClient.onSubscribingCalled)
+
+	mockClient.OnUnsubscribed(func(e centrifuge.ServerUnsubscribedEvent) {})
+	require.True(t, mockClient.onUnsubscribedCalled)
+
+	mockClient.OnPublication(func(e centrifuge.ServerPublicationEvent) {})
+	require.True(t, mockClient.onPublicationCalled)
+
+	mockClient.OnJoin(func(e centrifuge.ServerJoinEvent) {})
+	require.True(t, mockClient.onJoinCalled)
+
+	mockClient.OnLeave(func(e centrifuge.ServerLeaveEvent) {})
+	require.True(t, mockClient.onLeaveCalled)
+
+	// Test subscription creation
+	sub, err := mockClient.NewSubscription("test-channel", centrifuge.SubscriptionConfig{})
+	require.NoError(t, err)
+	require.NotNil(t, sub)
+
+	// Test empty channel error
+	sub, err = mockClient.NewSubscription("", centrifuge.SubscriptionConfig{})
+	require.Error(t, err)
+	require.Nil(t, sub)
+	require.Equal(t, "channel cannot be empty", err.Error())
+
+	// Test connect and close
+	err = mockClient.Connect()
+	require.NoError(t, err)
+	mockClient.Close()
+}
 
 func TestSubscribe(t *testing.T) {
 	// Test with nil context

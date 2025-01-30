@@ -1,13 +1,13 @@
 package junglebus
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/b-open-io/go-junglebus/transports"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,6 +49,7 @@ type testTransportHandler struct {
 	Type      string
 }
 
+//nolint:unused // Test transport handler request type for future test cases
 type testTransportHandlerRequest struct {
 	Path   string
 	Result func(w http.ResponseWriter, req *http.Request)
@@ -59,7 +60,7 @@ func TestNewJungleBusClient(t *testing.T) {
 	t.Run("new client - no options", func(t *testing.T) {
 		client, err := New()
 		require.NoError(t, err)
-		assert.IsType(t, Client{}, *client)
+		require.IsType(t, Client{}, *client)
 	})
 }
 
@@ -77,9 +78,9 @@ func TestGetTransport(t *testing.T) {
 			WithSSL(true),
 		)
 		transport := client.GetTransport()
-		assert.IsType(t, &transports.TransportHTTP{}, *transport)
-		assert.False(t, (*transport).IsDebug())
-		assert.True(t, (*transport).IsSSL())
+		require.IsType(t, &transports.TransportHTTP{}, *transport)
+		require.False(t, (*transport).IsDebug())
+		require.True(t, (*transport).IsSSL())
 	})
 
 	t.Run("transport with debug and no SSL", func(t *testing.T) {
@@ -89,9 +90,9 @@ func TestGetTransport(t *testing.T) {
 			WithSSL(false),
 		)
 		transport := client.GetTransport()
-		assert.IsType(t, &transports.TransportHTTP{}, *transport)
-		assert.True(t, (*transport).IsDebug())
-		assert.False(t, (*transport).IsSSL())
+		require.IsType(t, &transports.TransportHTTP{}, *transport)
+		require.True(t, (*transport).IsDebug())
+		require.False(t, (*transport).IsSSL())
 	})
 
 	t.Run("transport with explicit protocol", func(t *testing.T) {
@@ -100,9 +101,9 @@ func TestGetTransport(t *testing.T) {
 			WithSSL(false),
 		)
 		transport := client.GetTransport()
-		assert.IsType(t, &transports.TransportHTTP{}, *transport)
-		assert.False(t, (*transport).IsDebug())
-		assert.False(t, (*transport).IsSSL())
+		require.IsType(t, &transports.TransportHTTP{}, *transport)
+		require.False(t, (*transport).IsDebug())
+		require.False(t, (*transport).IsSSL())
 	})
 }
 
@@ -128,4 +129,29 @@ func getTestClient(transportHandler testTransportHandler) *Client {
 	client, _ := New(opts...)
 
 	return client
+}
+
+func TestTransportHandlerQueries(t *testing.T) {
+	handler := testTransportHandler{
+		ClientURL: "test.com",
+		Client: func(serverURL string, httpClient *http.Client) ClientOps {
+			return WithHTTPClient(serverURL, httpClient)
+		},
+		Type: requestTypeHTTP,
+		Queries: []*testTransportHandlerRequest{
+			{
+				Path: "/v1/transaction/get/" + txID,
+				Result: func(w http.ResponseWriter, req *http.Request) {
+					require.Equal(t, "GET", req.Method)
+					w.Header().Set("Content-Type", "application/json")
+					mustWrite(w, transactionJSON)
+				},
+			},
+		},
+	}
+
+	client := getTestClient(handler)
+	tx, err := client.GetTransaction(context.Background(), txID)
+	require.NoError(t, err)
+	require.Equal(t, txID, tx.ID)
 }

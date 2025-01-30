@@ -19,28 +19,36 @@ type ClientOps func(c *Client)
 type Client struct {
 	transports.TransportService
 	transport        transports.TransportService
-	transportOptions []transports.ClientOps
+	transportOptions []ClientOps
 	subscription     *Subscription
 	debug            bool
-}
-
-// New create a new jungle bus client
-func New(opts ...ClientOps) (*Client, error) {
-	client := &Client{}
-
-	client.setDefaultOptions()
-
-	for _, opt := range opts {
-		opt(client)
-	}
-
-	return client, nil
 }
 
 func (jb *Client) setDefaultOptions() {
 	jb.transport, _ = transports.NewTransport(
 		transports.WithHTTP(DefaultServer),
 	)
+}
+
+// New create a new jungle bus client
+func New(opts ...ClientOps) (*Client, error) {
+	client := &Client{
+		transportOptions: make([]ClientOps, 0),
+	}
+
+	// If no options provided, use defaults
+	if len(opts) == 0 {
+		client.setDefaultOptions()
+		return client, nil
+	}
+
+	// Apply all client options and store them for potential reconnection
+	for _, opt := range opts {
+		client.transportOptions = append(client.transportOptions, opt)
+		opt(client)
+	}
+
+	return client, nil
 }
 
 // SetDebug turn the debugging on or off

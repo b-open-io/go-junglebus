@@ -50,9 +50,13 @@ func TestLogin(t *testing.T) {
 		assert.Equal(t, "test-password", reqBody["password"])
 
 		// Mock response
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"token": "test-token",
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -119,9 +123,13 @@ func TestGetSubscriptionToken(t *testing.T) {
 		assert.Equal(t, "test-sub", reqBody["id"])
 
 		// Mock response
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"token": "test-token",
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 
@@ -174,9 +182,13 @@ func TestRefreshToken(t *testing.T) {
 	mux.HandleFunc("/v1/user/refresh-token", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		// Mock response
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"token": "new-token",
-		})
+		}); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 

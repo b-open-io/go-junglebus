@@ -142,7 +142,11 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 				MerkleProof: []byte("test-merkle-data-2"),
 			},
 		}
-		json.NewEncoder(w).Encode(transactions)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(transactions); err != nil {
+			t.Error(err)
+			return
+		}
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
 

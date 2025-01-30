@@ -2,8 +2,6 @@ module github.com/GorillaPool/go-junglebus
 
 go 1.21
 
-toolchain go1.23.5
-
 require (
 	github.com/centrifugal/centrifuge-go v0.10.4
 	github.com/stretchr/testify v1.10.0

@@ -1,8 +1,9 @@
+---
 # See more at: https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions
 name: run-go-tests
 
 env:
-  GO111MODULE: on
+  GO111MODULE: "on"
 
 on:
   pull_request:
@@ -12,7 +13,7 @@ on:
     branches:
       - "*"
   # schedule:
-  #  - cron: '1 4 * * *'
+  # - cron: '1 4 * * *'
 
 jobs:
   yamllint:

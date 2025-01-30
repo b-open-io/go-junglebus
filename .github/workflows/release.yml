@@ -1,13 +1,14 @@
+---
 # From: https://goreleaser.com/ci/actions/#usage
 name: release
 
 env:
-  GO111MODULE: on
+  GO111MODULE: "on"
 
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 permissions:
   contents: write
@@ -23,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: "1.21"
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4.2.0
         with:

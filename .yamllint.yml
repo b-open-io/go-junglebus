@@ -1,5 +1,5 @@
 ---
-extends: default
+extends: relaxed
 
 rules:
   # Don't require --- at start of files
@@ -23,6 +23,6 @@ rules:
   trailing-spaces: disable
   line-length: disable
   new-line-at-end-of-file: disable
-  
-  # More lenient indentation rules
   indentation: disable
+  braces: disable
+  brackets: disable

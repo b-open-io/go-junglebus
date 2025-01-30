@@ -1,3 +1,4 @@
+---
 # Basic dependabot.yml to update gomod, Github Actions and Docker
 version: 2
 updates:
@@ -8,7 +9,7 @@ updates:
     schedule:
       interval: "daily"
       time: "10:00"
-      timezone: "UTC"
+      timezone: "America/New_York"
     reviewers:
       - "mrz1836"
     assignees:

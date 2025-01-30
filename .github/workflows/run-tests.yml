@@ -2,9 +2,6 @@
 # See more at: https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions
 name: run-go-tests
 
-env:
-  GO111MODULE: true
-
 on:
   pull_request:
     branches:
@@ -30,11 +27,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Write go list
-        run: go list -json -m all > go.list
-      - name: Ask Nancy
-        uses: sonatype-nexus-community/nancy-github-action@v1.0.3
-        continue-on-error: true
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.x'
+      - name: Run Nancy
+        run: |
+          go install github.com/sonatype-nexus-community/nancy@latest
+          go list -json -deps ./... | nancy sleuth
   test:
     needs: [yamllint, asknancy]
     strategy:

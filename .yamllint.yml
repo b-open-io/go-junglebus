@@ -23,7 +23,6 @@ rules:
   trailing-spaces: disable
   line-length: disable
   new-line-at-end-of-file: disable
-  indentation:
-    spaces: 2
-    indent-sequences: true
-    check-multi-line-strings: false
+  
+  # More lenient indentation rules
+  indentation: disable

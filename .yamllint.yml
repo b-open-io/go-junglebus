@@ -1,36 +1,30 @@
 ---
-
-yaml-files:
-  - '*.yaml'
-  - '*.yml'
-  - '.yamllint'
-
-ignore: |
-  dist/
+extends: relaxed
 
 rules:
-  braces: enable
-  brackets: enable
-  colons: enable
-  commas: enable
+  # Don't require --- at start of files
+  document-start: disable
+  
+  # Don't be so strict about comments
   comments:
+    min-spaces-from-content: 1
+    require-starting-space: false
     level: warning
-  comments-indentation:
+  
+  comments-indentation: disable
+  
+  # Don't be strict about truthy values
+  truthy:
+    check-keys: false
+    allowed-values: ['true', 'false', 'on', 'off']
     level: warning
-  document-end: disable
-  document-start:
-    level: warning
-  empty-lines: enable
-  empty-values: disable
-  hyphens: enable
-  indentation: enable
-  key-duplicates: enable
-  key-ordering: disable
+  
+  # Other common annoyances
+  trailing-spaces: disable
   line-length: disable
   new-line-at-end-of-file: disable
-  new-lines: enable
-  octal-values: disable
-  quoted-strings: disable
-  trailing-spaces: enable
-  truthy:
-    level: warning
+  indentation: disable
+  braces: disable
+  brackets: disable
+  key-duplicates: disable
+  key-ordering: disable

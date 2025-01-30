@@ -3,7 +3,7 @@ package junglebus
 import (
 	"net/http"
 
-	"github.com/GorillaPool/go-junglebus/transports"
+	"github.com/b-open-io/go-junglebus/transports"
 )
 
 // WithHTTP will overwrite the default server url (junglebus.gorillapool.io)

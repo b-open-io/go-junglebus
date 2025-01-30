@@ -3,11 +3,11 @@
 // If you have any suggestions or comments, please feel free to open an issue on
 // this GitHub repository!
 //
-// By GorillaPool (https://githujb.com/GorillaPool)
+// By GorillaPool (https://githujb.com/b-open-io)
 package junglebus
 
 import (
-	"github.com/GorillaPool/go-junglebus/transports"
+	"github.com/b-open-io/go-junglebus/transports"
 )
 
 var DefaultServer = "junglebus.gorillapool.io"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // GetBlockHeader get the block header for the given block hash or height

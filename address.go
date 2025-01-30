@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // GetAddressTransactions get transaction meta data for the given address

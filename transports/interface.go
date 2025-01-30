@@ -3,7 +3,7 @@ package transports
 import (
 	"context"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // AddressService is the address related requests

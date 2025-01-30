@@ -81,6 +81,7 @@ func TestGetTransport(t *testing.T) {
 		require.IsType(t, &transports.TransportHTTP{}, *transport)
 		require.False(t, (*transport).IsDebug())
 		require.True(t, (*transport).IsSSL())
+		require.NotNil(t, client.transportOptions)
 	})
 
 	t.Run("transport with debug and no SSL", func(t *testing.T) {
@@ -151,7 +152,23 @@ func TestTransportHandlerQueries(t *testing.T) {
 	}
 
 	client := getTestClient(handler)
+	require.NotNil(t, client.transportOptions)
 	tx, err := client.GetTransaction(context.Background(), txID)
 	require.NoError(t, err)
 	require.Equal(t, txID, tx.ID)
+}
+
+func TestClientTransportOptions(t *testing.T) {
+	handler := testTransportHandler{
+		ClientURL: "test.com",
+		Client: func(serverURL string, httpClient *http.Client) ClientOps {
+			return WithHTTPClient(serverURL, httpClient)
+		},
+		Type:   requestTypeHTTP,
+		Path:   "/test",
+		Result: "{}",
+	}
+
+	client := getTestClient(handler)
+	require.NotNil(t, client.transportOptions)
 }

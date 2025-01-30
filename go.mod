@@ -1,4 +1,4 @@
-module github.com/GorillaPool/go-junglebus
+module github.com/b-open-io/go-junglebus
 
 go 1.21
 

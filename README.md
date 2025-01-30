@@ -1,17 +1,17 @@
 # JungleBus: Go Client
 > Get started using [JungleBus](https://junglebus.gorillapool.io) in five minutes
 
-[![Release](https://img.shields.io/github/release-pre/GorillaPool/go-junglebus.svg?logo=github&style=flat&v=2)](https://github.com/GorillaPool/go-junglebus/releases)
-[![Build Status](https://img.shields.io/github/workflow/status/GorillaPool/go-junglebus/run-go-tests?logo=github&v=2)](https://github.com/GorillaPool/go-junglebus/actions)
-[![Report](https://goreportcard.com/badge/github.com/GorillaPool/go-junglebus?style=flat&v=2)](https://goreportcard.com/report/github.com/GorillaPool/go-junglebus)
-[![codecov](https://codecov.io/gh/GorillaPool/go-junglebus/branch/master/graph/badge.svg?v=2)](https://codecov.io/gh/GorillaPool/go-junglebus)
-[![Mergify Status](https://img.shields.io/endpoint.svg?url=https://api.mergify.com/v1/badges/GorillaPool/go-junglebus&style=flat&v=2)](https://mergify.io)
-[![Go](https://img.shields.io/github/go-mod/go-version/GorillaPool/go-junglebus?v=2)](https://golang.org/)
+[![Release](https://img.shields.io/github/release-pre/b-open-io/go-junglebus.svg?logo=github&style=flat&v=2)](https://github.com/b-open-io/go-junglebus/releases)
+[![Build Status](https://img.shields.io/github/workflow/status/b-open-io/go-junglebus/run-go-tests?logo=github&v=2)](https://github.com/b-open-io/go-junglebus/actions)
+[![Report](https://goreportcard.com/badge/github.com/b-open-io/go-junglebus?style=flat&v=2)](https://goreportcard.com/report/github.com/b-open-io/go-junglebus)
+[![codecov](https://codecov.io/gh/b-open-io/go-junglebus/branch/master/graph/badge.svg?v=2)](https://codecov.io/gh/b-open-io/go-junglebus)
+[![Mergify Status](https://img.shields.io/endpoint.svg?url=https://api.mergify.com/v1/badges/b-open-io/go-junglebus&style=flat&v=2)](https://mergify.io)
+[![Go](https://img.shields.io/github/go-mod/go-version/b-open-io/go-junglebus?v=2)](https://golang.org/)
 <br>
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod&v=2)](https://gitpod.io/#https://github.com/GorillaPool/go-junglebus)
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod&v=2)](https://gitpod.io/#https://github.com/b-open-io/go-junglebus)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat&v=2)](https://github.com/RichardLitt/standard-readme)
 [![Makefile Included](https://img.shields.io/badge/Makefile-Supported%20-brightgreen?=flat&logo=probot&v=2)](Makefile)
-[![Sponsor](https://img.shields.io/badge/sponsor-mrz1836-181717.svg?logo=github&style=flat&v=2)](https://github.com/sponsors/GorillaPool)
+[![Sponsor](https://img.shields.io/badge/sponsor-mrz1836-181717.svg?logo=github&style=flat&v=2)](https://github.com/sponsors/b-open-io)
 [![Donate](https://img.shields.io/badge/donate-bitcoin-ff9900.svg?logo=bitcoin&style=flat&v=2)](https://gobitcoinsv.com/#sponsor?utm_source=github&utm_medium=sponsor-link&utm_campaign=go-junglebusclient&utm_term=go-junglebusclient&utm_content=go-junglebusclient)
 
 <br/>
@@ -24,8 +24,8 @@ import (
     "log"
     "time"
 
-    "github.com/GorillaPool/go-junglebus"
-    "github.com/GorillaPool/go-junglebus/models"
+    "github.com/b-open-io/go-junglebus"
+    "github.com/b-open-io/go-junglebus/models"
 )
 
 wg := &sync.WaitGroup{}
@@ -113,15 +113,15 @@ Lite mode is a feature that allows you to receive only the transaction hashes an
 
 **go-junglebusclient** requires a [supported release of Go](https://golang.org/doc/devel/release.html#policy).
 ```shell script
-go get -u github.com/GorillaPool/go-junglebus
+go get -u github.com/b-open-io/go-junglebus
 ```
 
 <br/>
 
 ## Documentation
-View the generated [documentation](https://pkg.go.dev/github.com/GorillaPool/go-junglebus)
+View the generated [documentation](https://pkg.go.dev/github.com/b-open-io/go-junglebus)
 
-[![GoDoc](https://godoc.org/github.com/GorillaPool/go-junglebus?status.svg&style=flat&v=2)](https://pkg.go.dev/github.com/GorillaPool/go-junglebus)
+[![GoDoc](https://godoc.org/github.com/b-open-io/go-junglebus?status.svg&style=flat&v=2)](https://pkg.go.dev/github.com/b-open-io/go-junglebus)
 
 <br/>
 
@@ -242,7 +242,7 @@ vet                           Run the Go vet application
 <br/>
 
 ## Examples & Tests
-All unit tests and [examples](examples) run via [Github Actions](https://github.com/GorillaPool/go-junglebus/actions) and
+All unit tests and [examples](examples) run via [Github Actions](https://github.com/b-open-io/go-junglebus/actions) and
 uses [Go version 1.18.x](https://golang.org/doc/go1.18). View the [configuration file](.github/workflows/run-tests.yml).
 
 <br/>
@@ -287,10 +287,10 @@ View the [contributing guidelines](.github/CONTRIBUTING.md) and follow the [code
 ### How can I help?
 All kinds of contributions are welcome :raised_hands:!
 The most basic way to show your support is to star :star2: the project, or to raise issues :speech_balloon:.
-You can also support this project by [becoming a sponsor on GitHub](https://github.com/sponsors/GorillaPool) :clap:
+You can also support this project by [becoming a sponsor on GitHub](https://github.com/sponsors/b-open-io) :clap:
 or by making a [**bitcoin donation**](https://gobitcoinsv.com/#sponsor?utm_source=github&utm_medium=sponsor-link&utm_campaign=go-junglebusclient&utm_term=go-junglebusclient&utm_content=go-junglebusclient) to ensure this journey continues indefinitely! :rocket:
 
-[![Stars](https://img.shields.io/github/stars/GorillaPool/go-junglebus?label=Please%20like%20us&style=social&v=2)](https://github.com/GorillaPool/go-junglebus/stargazers)
+[![Stars](https://img.shields.io/github/stars/b-open-io/go-junglebus?label=Please%20like%20us&style=social&v=2)](https://github.com/b-open-io/go-junglebus/stargazers)
 
 <br/>
 
@@ -302,7 +302,7 @@ Thank you to these wonderful people ([emoji key](https://allcontributors.org/doc
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="https://github.com/icellan"><img src="https://avatars.githubusercontent.com/u/4411176?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Siggi</b></sub></a><br /><a href="#infra-icellan" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="https://github.com/GorillaPool/go-junglebus/commits?author=icellan" title="Code">💻</a> <a href="#security-icellan" title="Security">🛡️</a></td>
+    <td align="center"><a href="https://github.com/icellan"><img src="https://avatars.githubusercontent.com/u/4411176?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Siggi</b></sub></a><br /><a href="#infra-icellan" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="https://github.com/b-open-io/go-junglebus/commits?author=icellan" title="Code">💻</a> <a href="#security-icellan" title="Security">🛡️</a></td>
   </tr>
 </table>
 
@@ -317,4 +317,4 @@ Thank you to these wonderful people ([emoji key](https://allcontributors.org/doc
 
 ## License
 
-[![License](https://img.shields.io/github/license/GorillaPool/go-junglebus.svg?style=flat&v=2)](LICENSE)
+[![License](https://img.shields.io/github/license/b-open-io/go-junglebus.svg?style=flat&v=2)](LICENSE)

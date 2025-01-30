@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

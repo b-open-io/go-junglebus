@@ -23,4 +23,3 @@ jobs:
         uses: rohenaz/pr-agent@v0.0.1
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

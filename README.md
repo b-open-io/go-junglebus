@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/release-pre/b-open-io/go-junglebus.svg?logo=github&style=flat&v=2)](https://github.com/b-open-io/go-junglebus/releases)
 [![Build Status](https://img.shields.io/github/workflow/status/b-open-io/go-junglebus/run-go-tests?logo=github&v=2)](https://github.com/b-open-io/go-junglebus/actions)
 [![Report](https://goreportcard.com/badge/github.com/b-open-io/go-junglebus?style=flat&v=2)](https://goreportcard.com/report/github.com/b-open-io/go-junglebus)
-[![codecov](https://codecov.io/gh/b-open-io/go-junglebus/branch/master/graph/badge.svg?v=2)](https://codecov.io/gh/b-open-io/go-junglebus)
+[![codecov](https://codecov.io/gh/b-open-io/go-junglebus/graph/badge.svg?token=GDH2NNJnR5)](https://codecov.io/gh/b-open-io/go-junglebus)
 [![Mergify Status](https://img.shields.io/endpoint.svg?url=https://api.mergify.com/v1/badges/b-open-io/go-junglebus&style=flat&v=2)](https://mergify.io)
 [![Go](https://img.shields.io/github/go-mod/go-version/b-open-io/go-junglebus?v=2)](https://golang.org/)
 <br>
@@ -119,7 +119,7 @@ go get -u github.com/b-open-io/go-junglebus
 <br/>
 
 ## Documentation
-View the generated [documentation](https://pkg.go.dev/github.com/b-open-io/go-junglebus)
+Visit [pkg.go.dev](https://pkg.go.dev/github.com/b-open-io/go-junglebus) for the complete documentation.
 
 [![GoDoc](https://godoc.org/github.com/b-open-io/go-junglebus?status.svg&style=flat&v=2)](https://pkg.go.dev/github.com/b-open-io/go-junglebus)
 

@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Validate Secrets
         run: |
-          if [ -z "${{ secrets.OPENAI_KEY }}" ] || [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
+          if [ -z "${{ secrets.OPENAI_KEY }}" ]; then
             echo "Required secrets are missing!" && exit 1;
           fi
       - name: Satchmodamus PR Agent

@@ -3,7 +3,7 @@
 // If you have any suggestions or comments, please feel free to open an issue on
 // this GitHub repository!
 //
-// By GorillaPool (https://githujb.com/b-open-io)
+// By BOpen (https://githujb.com/b-open-io)
 package junglebus
 
 import (

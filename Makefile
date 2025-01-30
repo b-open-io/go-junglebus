@@ -11,7 +11,7 @@ endif
 
 ## Not defined? Use default repo owner
 ifeq ($(REPO_OWNER),)
-	REPO_OWNER="GorillaPool"
+	REPO_OWNER="b-open-io"
 endif
 
 .PHONY: clean install-all-contributors update-contributors

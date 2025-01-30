@@ -277,3 +277,15 @@ func TestTransportHTTP_InvalidURL(t *testing.T) {
 	_, err := transport.GetTransaction(context.Background(), "test-tx")
 	assert.Error(t, err)
 }
+
+func TestTransportHTTP_GetVersion(t *testing.T) {
+	transport := &TransportHTTP{
+		version: "v1.2.3",
+	}
+
+	version := transport.GetVersion()
+
+	if version != "v1.2.3" {
+		t.Errorf("Expected version to be v1.2.3, got %s", version)
+	}
+}

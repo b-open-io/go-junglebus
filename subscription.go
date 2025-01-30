@@ -123,13 +123,37 @@ type SubscribeOptions struct {
 }
 
 func (jb *Client) Subscribe(ctx context.Context, subscriptionID string, fromBlock uint64, eventHandler EventHandler) (*Subscription, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("context cannot be nil")
+	}
+	if subscriptionID == "" {
+		return nil, fmt.Errorf("subscription ID cannot be empty")
+	}
 	return jb.SubscribeWithQueue(ctx, subscriptionID, fromBlock, 0, eventHandler, &SubscribeOptions{
 		QueueSize: 100000,
 	})
 }
 
 func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string, fromBlock uint64, fromPage uint64, eventHandler EventHandler, options *SubscribeOptions) (*Subscription, error) {
-	var subs *Subscription
+	if ctx == nil {
+		return nil, fmt.Errorf("context cannot be nil")
+	}
+	if subscriptionID == "" {
+		return nil, fmt.Errorf("subscription ID cannot be empty")
+	}
+	if options == nil {
+		return nil, fmt.Errorf("subscribe options cannot be nil")
+	}
+
+	var subs = &Subscription{
+		SubscriptionID: subscriptionID,
+		FromBlock:      fromBlock,
+		EventHandler:   eventHandler,
+		client:         jb,
+		subscriptions:  map[string]*centrifuge.Subscription{},
+		pubChan:        make(chan *pubEvent, options.QueueSize),
+	}
+
 	currentBlock = uint32(fromBlock)
 	currentPage = fromPage
 
@@ -165,10 +189,10 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 
 	centrifugeClient.OnConnecting(func(e centrifuge.ConnectingEvent) {
 		if jb.subscription != nil {
-			for _, sub := range subs.subscriptions {
+			for _, sub := range jb.subscription.subscriptions {
 				sub.Unsubscribe()
 			}
-			subs.wg.Wait()
+			jb.subscription.wg.Wait()
 			eventHandler.OnStatus(&models.ControlResponse{
 				StatusCode: uint32(StatusConnecting),
 				Status:     "reconnecting",
@@ -243,15 +267,8 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 			Message:    "Unsubscribed from " + e.Channel,
 		})
 	})
-	subs = &Subscription{
-		SubscriptionID:   subscriptionID,
-		FromBlock:        fromBlock,
-		EventHandler:     eventHandler,
-		client:           jb,
-		centrifugeClient: centrifugeClient,
-		subscriptions:    map[string]*centrifuge.Subscription{},
-		pubChan:          make(chan *pubEvent, options.QueueSize),
-	}
+
+	subs.centrifugeClient = centrifugeClient
 	go subs.handlePubChan(options)
 
 	centrifugeClient.OnPublication(func(e centrifuge.ServerPublicationEvent) {
@@ -306,7 +323,6 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 
 	if eventHandler.OnTransaction != nil {
 		if subs.subscriptions["main"], err = subs.startSubscription(subType + `:` + subscriptionID + `:` + strconv.FormatUint(fromBlock, 10) + `:` + strconv.FormatUint(currentPage, 10)); err != nil {
-			// if subs.subscriptions["main"], err = subs.startSubscription(`query:` + subscriptionID + `:` + strconv.FormatUint(fromBlock, 10)); err != nil {
 			return nil, err
 		}
 		subs.subscriptions["main"].OnPublication(func(e centrifuge.PublicationEvent) {
@@ -343,6 +359,10 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 }
 
 func (s *Subscription) startSubscription(subscription string) (*centrifuge.Subscription, error) {
+	if subscription == "" {
+		return nil, fmt.Errorf("subscription channel cannot be empty")
+	}
+
 	sub, err := s.centrifugeClient.NewSubscription(subscription, centrifuge.SubscriptionConfig{
 		Recoverable: true,
 	})

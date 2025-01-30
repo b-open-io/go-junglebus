@@ -14,7 +14,7 @@ import (
 func TestGetAddressTransactions(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -25,12 +25,12 @@ func TestGetAddressTransactions(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetAddressTransactions(context.Background(), "")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
 	_, err = client.GetAddressTransactions(nil, "test-address")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
 	// Create test server for successful case
@@ -84,13 +84,13 @@ func TestGetAddressTransactions(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetAddressTransactions(context.Background(), "test-address")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestGetAddressTransactionDetails(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -101,12 +101,12 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetAddressTransactionDetails(context.Background(), "")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
 	_, err = client.GetAddressTransactionDetails(nil, "test-address")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
 	// Create test server for successful case
@@ -184,5 +184,5 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetAddressTransactionDetails(context.Background(), "test-address")
-	assert.Error(t, err)
+	require.Error(t, err)
 }

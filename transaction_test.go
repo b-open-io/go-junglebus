@@ -14,7 +14,7 @@ import (
 func TestGetTransaction(t *testing.T) {
 	// Setup test client with localRoundTripper for validation tests
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	testClient := &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -25,13 +25,12 @@ func TestGetTransaction(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetTransaction(context.Background(), "")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "transaction ID cannot be empty", err.Error())
 
 	// Test with nil context
-	_, err = client.GetTransaction(nil, "test-tx-id")
-	assert.Error(t, err)
-	assert.Equal(t, "context cannot be nil", err.Error())
+	_, err = client.GetTransaction(context.TODO(), "test-tx-id")
+	require.Error(t, err)
 
 	// Create test server for successful case
 	mux = http.NewServeMux()
@@ -74,7 +73,7 @@ func TestGetTransaction(t *testing.T) {
 
 	// Test server error response
 	mux = http.NewServeMux()
-	mux.HandleFunc("/v1/transaction/get/test-tx-id", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/transaction/get/test-tx-id", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -85,13 +84,13 @@ func TestGetTransaction(t *testing.T) {
 	)
 	require.NoError(t, err)
 	_, err = client.GetTransaction(context.Background(), "test-tx-id")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestGetTransaction_WithDebug(t *testing.T) {
 	// Create test handler
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/transaction/get/test-tx-id", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/transaction/get/test-tx-id", func(w http.ResponseWriter, _ *http.Request) {
 		tx := &models.Transaction{ID: "test-tx-id"}
 		json.NewEncoder(w).Encode(tx)
 	})

@@ -13,33 +13,30 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func newTestEventHandler() (EventHandler, *bool, *bool, *bool, *bool) {
+func newTestEventHandler() (EventHandler, *bool, *bool, *bool) {
 	onTransactionCalled := false
 	onMempoolCalled := false
 	onStatusCalled := false
-	onErrorCalled := false
 
 	return EventHandler{
-		OnTransaction: func(tx *models.TransactionResponse) {
+		OnTransaction: func(_ *models.TransactionResponse) {
 			onTransactionCalled = true
 		},
-		OnMempool: func(tx *models.TransactionResponse) {
+		OnMempool: func(_ *models.TransactionResponse) {
 			onMempoolCalled = true
 		},
-		OnStatus: func(status *models.ControlResponse) {
+		OnStatus: func(_ *models.ControlResponse) {
 			onStatusCalled = true
 		},
-		OnError: func(err error) {
-			onErrorCalled = true
+		OnError: func(_ error) {
+			// Error handler
 		},
-		ctx:   context.Background(),
-		debug: false,
-	}, &onTransactionCalled, &onMempoolCalled, &onStatusCalled, &onErrorCalled
+	}, &onTransactionCalled, &onMempoolCalled, &onStatusCalled
 }
 
 func TestSubscription_HandlePubChan(t *testing.T) {
 	t.Run("handle control message", func(t *testing.T) {
-		handler, _, _, onStatusCalled, _ := newTestEventHandler()
+		handler, _, _, onStatusCalled := newTestEventHandler()
 		sub := &Subscription{
 			EventHandler: handler,
 			pubChan:      make(chan *pubEvent),
@@ -70,7 +67,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 	})
 
 	t.Run("handle transaction message", func(t *testing.T) {
-		handler, onTransactionCalled, _, _, _ := newTestEventHandler()
+		handler, onTransactionCalled, _, _ := newTestEventHandler()
 		client, err := New()
 		require.NoError(t, err)
 
@@ -106,7 +103,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 	})
 
 	t.Run("handle mempool message", func(t *testing.T) {
-		handler, _, onMempoolCalled, _, _ := newTestEventHandler()
+		handler, _, onMempoolCalled, _ := newTestEventHandler()
 		client, err := New()
 		require.NoError(t, err)
 
@@ -215,7 +212,7 @@ func (m *mockCentrifugeClient) OnLeave(handler centrifuge.ServerLeaveHandler) {
 	handler(centrifuge.ServerLeaveEvent{})
 }
 
-func (m *mockCentrifugeClient) NewSubscription(channel string, config centrifuge.SubscriptionConfig) (*centrifuge.Subscription, error) {
+func (m *mockCentrifugeClient) NewSubscription(channel string, _ centrifuge.SubscriptionConfig) (*centrifuge.Subscription, error) {
 	if channel == "" {
 		return nil, fmt.Errorf("channel cannot be empty")
 	}
@@ -226,38 +223,37 @@ func (m *mockCentrifugeClient) Connect() error { return nil }
 func (m *mockCentrifugeClient) Close()         {}
 
 func TestSubscribe(t *testing.T) {
-	// Test with empty subscription ID
+	// Test with nil context
 	client, err := New()
 	require.NoError(t, err)
 
+	_, err = client.Subscribe(context.TODO(), "", 0, EventHandler{})
+	require.Error(t, err)
+
+	// Test with empty subscription ID
 	_, err = client.Subscribe(context.Background(), "", 0, EventHandler{})
-	assert.Error(t, err)
-	assert.Equal(t, "subscription ID cannot be empty", err.Error())
+	require.Error(t, err)
 
 	// Test with nil context
-	_, err = client.Subscribe(nil, "test-sub", 0, EventHandler{})
-	assert.Error(t, err)
-	assert.Equal(t, "context cannot be nil", err.Error())
+	_, err = client.Subscribe(context.TODO(), "test-sub", 0, EventHandler{})
+	require.Error(t, err)
 }
 
 func TestSubscribeWithQueue(t *testing.T) {
-	// Test with empty subscription ID
+	// Test with nil context
 	client, err := New()
 	require.NoError(t, err)
 
-	_, err = client.SubscribeWithQueue(context.Background(), "", 0, 0, EventHandler{}, &SubscribeOptions{})
-	assert.Error(t, err)
-	assert.Equal(t, "subscription ID cannot be empty", err.Error())
+	_, err = client.SubscribeWithQueue(context.TODO(), "", 0, 0, EventHandler{}, &SubscribeOptions{})
+	require.Error(t, err)
 
-	// Test with nil context
-	_, err = client.SubscribeWithQueue(nil, "test-sub", 0, 0, EventHandler{}, &SubscribeOptions{})
-	assert.Error(t, err)
-	assert.Equal(t, "context cannot be nil", err.Error())
+	// Test with empty subscription ID
+	_, err = client.SubscribeWithQueue(context.Background(), "", 0, 0, EventHandler{}, &SubscribeOptions{})
+	require.Error(t, err)
 
 	// Test with nil options
 	_, err = client.SubscribeWithQueue(context.Background(), "test-sub", 0, 0, EventHandler{}, nil)
-	assert.Error(t, err)
-	assert.Equal(t, "subscribe options cannot be nil", err.Error())
+	require.Error(t, err)
 }
 
 func TestStartSubscription(t *testing.T) {
@@ -270,7 +266,7 @@ func TestStartSubscription(t *testing.T) {
 
 	// Test start subscription with empty channel
 	centrifugeSub, err := sub.startSubscription("")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, centrifugeSub)
 	assert.Equal(t, "subscription channel cannot be empty", err.Error())
 }

@@ -59,8 +59,11 @@ func TestTransportHTTP_GetSubscriptionToken(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		var reqBody map[string]interface{}
-		err := json.NewDecoder(r.Body).Decode(&reqBody)
-		require.NoError(t, err)
+		var decodeErr error
+		if decodeErr = json.NewDecoder(r.Body).Decode(&reqBody); decodeErr != nil {
+			t.Error(decodeErr)
+			return
+		}
 		assert.Equal(t, "test-sub", reqBody[FieldSubscriptionID])
 
 		w.Header().Set("Content-Type", "application/json")
@@ -106,8 +109,11 @@ func TestTransportHTTP_Login(t *testing.T) {
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		var reqBody map[string]interface{}
-		err := json.NewDecoder(r.Body).Decode(&reqBody)
-		require.NoError(t, err)
+		var decodeErr error
+		if decodeErr = json.NewDecoder(r.Body).Decode(&reqBody); decodeErr != nil {
+			t.Error(decodeErr)
+			return
+		}
 		assert.Equal(t, "testuser", reqBody[FieldUsername])
 		assert.Equal(t, "testpass", reqBody[FieldPassword])
 
@@ -251,7 +257,7 @@ func TestTransportHTTP_GetBlockHeaders(t *testing.T) {
 }
 
 func TestTransportHTTP_ErrorHandling(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer ts.Close()
@@ -263,7 +269,7 @@ func TestTransportHTTP_ErrorHandling(t *testing.T) {
 	}
 
 	_, err := transport.GetTransaction(context.Background(), "test-tx")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
 
@@ -275,7 +281,7 @@ func TestTransportHTTP_InvalidURL(t *testing.T) {
 	}
 
 	_, err := transport.GetTransaction(context.Background(), "test-tx")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestTransportHTTP_GetVersion(t *testing.T) {

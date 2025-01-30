@@ -4,7 +4,7 @@ description: Do you have a question, comment or concern?
 title: "[Question]: "
 labels: [question]
 assignees:
-  - mrz1836
+  - rohenaz
 body:
   - type: textarea
     id: question

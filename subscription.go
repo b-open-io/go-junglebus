@@ -203,7 +203,7 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 				Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
 			})
 			_ = jb.Unsubscribe()
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Second)
 			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
 			if err != nil {
 				eventHandler.OnError(err)

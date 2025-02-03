@@ -24,9 +24,11 @@ func main() {
 		var blockHeader *models.BlockHeader
 		if blockHeader, err = junglebusClient.GetChainTip(context.Background()); err != nil {
 			log.Printf("ERROR: failed getting chain tip %s", err.Error())
-		} else {
+		} else if blockHeader != nil {
 			j, _ := json.Marshal(blockHeader)
 			log.Printf("Got chain tip %s", string(j))
+		} else {
+			log.Printf("ERROR: chain tip is nil")
 		}
 		os.Exit(0)
 	}
@@ -35,9 +37,11 @@ func main() {
 	var blockHeader *models.BlockHeader
 	if blockHeader, err = junglebusClient.GetBlockHeader(context.Background(), block); err != nil {
 		log.Printf("ERROR: failed getting block header %s", err.Error())
-	} else {
+	} else if blockHeader != nil {
 		j, _ := json.Marshal(blockHeader)
 		log.Printf("Got block header %s", string(j))
+	} else {
+		log.Printf("ERROR: block header is nil")
 	}
 	os.Exit(0)
 }

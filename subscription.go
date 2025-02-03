@@ -202,7 +202,11 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 				Status:     "reconnecting",
 				Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
 			})
-			_ = jb.Unsubscribe()
+			err = jb.Unsubscribe()
+			if err != nil {
+				log.Printf("ERROR: failed to unsubscribe: %v", err)
+				eventHandler.OnError(err)
+			}
 			time.Sleep(10 * time.Second)
 			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
 			if err != nil {

@@ -31,28 +31,14 @@ type pubEvent struct {
 	Data    []byte
 }
 
-// 2025/02/03 21:38:01 [DEBUG] Unsubscribing from query:5af4235fe3e2a36965a46805a10dd48e0d659467c7f5df0a8c48ba5d32e406dd:mempool
-// 2025/02/03 21:38:01 [DEBUG] Unsubscribing from query:5af4235fe3e2a36965a46805a10dd48e0d659467c7f5df0a8c48ba5d32e406dd:control
-// 2025/02/03 21:38:01 [DEBUG] Unsubscribing from query:5af4235fe3e2a36965a46805a10dd48e0d659467c7f5df0a8c48ba5d32e406dd:882469:0
-// 2025/02/03 21:38:01 [DEBUG] Unsubscribed from subscriptions
-// 2025/02/03 21:38:01 [DEBUG] Closing pubChan
-// 2025/02/03 21:38:01 [DEBUG] Closed pubChan
-// 2025/02/03 21:38:01 Reconnecting to Junglebus
-
 func (s *Subscription) Unsubscribe() (err error) {
-
 	for _, sub := range s.subscriptions {
-		log.Printf("[DEBUG] Unsubscribing from %s", sub.Channel)
 		err = sub.Unsubscribe()
 	}
-	log.Printf("[DEBUG] Unsubscribed from subscriptions")
 	if !s.closed {
-		log.Printf("[DEBUG] Closing pubChan")
 		close(s.pubChan)
 	}
-	log.Printf("[DEBUG] Closed pubChan")
 	go s.centrifugeClient.Close()
-	log.Printf("[DEBUG] Closed centrifugeClient")
 	s.closed = true
 	return err
 }
@@ -220,7 +206,7 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 				log.Printf("ERROR: failed to unsubscribe: %v", err)
 				eventHandler.OnError(err)
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(1 * time.Second)
 			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
 			if err != nil {
 				log.Printf("ERROR: failed to reconnect: %v", err)

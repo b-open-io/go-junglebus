@@ -34,12 +34,17 @@ type pubEvent struct {
 func (s *Subscription) Unsubscribe() (err error) {
 
 	for _, sub := range s.subscriptions {
+		log.Printf("[DEBUG] Unsubscribing from %s", sub.Channel)
 		err = sub.Unsubscribe()
 	}
+	log.Printf("[DEBUG] Unsubscribed from subscriptions")
 	if !s.closed {
+		log.Printf("[DEBUG] Closing pubChan")
 		close(s.pubChan)
 	}
+	log.Printf("[DEBUG] Closed pubChan")
 	s.centrifugeClient.Close()
+	log.Printf("[DEBUG] Closed centrifugeClient")
 	s.closed = true
 	return err
 }

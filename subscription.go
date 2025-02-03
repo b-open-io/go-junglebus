@@ -206,6 +206,7 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 			time.Sleep(10 * time.Second)
 			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
 			if err != nil {
+				log.Printf("ERROR: failed to reconnect: %v", err)
 				eventHandler.OnError(err)
 			}
 			return

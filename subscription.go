@@ -32,14 +32,13 @@ type pubEvent struct {
 }
 
 func (s *Subscription) Unsubscribe() (err error) {
-
 	for _, sub := range s.subscriptions {
 		err = sub.Unsubscribe()
 	}
 	if !s.closed {
 		close(s.pubChan)
 	}
-	s.centrifugeClient.Close()
+	go s.centrifugeClient.Close()
 	s.closed = true
 	return err
 }
@@ -202,10 +201,15 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 				Status:     "reconnecting",
 				Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
 			})
-			_ = jb.Unsubscribe()
+			err = jb.Unsubscribe()
+			if err != nil {
+				log.Printf("ERROR: failed to unsubscribe: %v", err)
+				eventHandler.OnError(err)
+			}
 			time.Sleep(1 * time.Second)
 			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
 			if err != nil {
+				log.Printf("ERROR: failed to reconnect: %v", err)
 				eventHandler.OnError(err)
 			}
 			return

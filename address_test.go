@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"net/http/httptest"
+
 	"github.com/b-open-io/go-junglebus/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,56 +33,55 @@ func TestGetAddressTransactions(t *testing.T) {
 		WithHTTPClient("test-url", testClient),
 	)
 	require.NoError(t, err)
-	_, err = client.GetAddressTransactions(context.Background(), "")
+	_, err = client.GetAddressTransactions(context.Background(), "", 0)
 	require.Error(t, err)
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
-	_, err = client.GetAddressTransactions(getNilContext(), "test-address")
+	_, err = client.GetAddressTransactions(getNilContext(), "test-address", 0)
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
 	// Create test server for successful case
 	mux = http.NewServeMux()
-	mux.HandleFunc("/v1/address/get/test-address", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/address/get/test-address/0", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "test-token", r.Header.Get("token"))
-
-		// Mock response
-		addresses := []*models.Address{
+		// Mock response with AddressTx
+		addresses := []*models.AddressTx{
 			{
 				ID:            "test-id",
-				Address:       "test-address",
 				TransactionID: "test-tx-id",
+				BlockHeight:   0,
 				BlockHash:     "test-block-hash",
 				BlockIndex:    1,
+				BlockPage:     0,
 			},
 		}
 		json.NewEncoder(w).Encode(addresses)
 	})
-	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
-
-	// Create client with test client
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
 	client, err = New(
-		WithHTTPClient("test-url", testClient),
+		WithHTTPClient(ts.Listener.Addr().String(), http.DefaultClient),
 		WithToken("test-token"),
 		WithVersion("v1"),
+		WithSSL(false),
 	)
 	require.NoError(t, err)
 
 	// Test successful address fetch
-	addresses, err := client.GetAddressTransactions(context.Background(), "test-address")
+	addresses, err := client.GetAddressTransactions(context.Background(), "test-address", 0)
 	require.NoError(t, err)
 	require.Len(t, addresses, 1)
 	assert.Equal(t, "test-id", addresses[0].ID)
-	assert.Equal(t, "test-address", addresses[0].Address)
 	assert.Equal(t, "test-tx-id", addresses[0].TransactionID)
 	assert.Equal(t, "test-block-hash", addresses[0].BlockHash)
 	assert.Equal(t, uint64(1), addresses[0].BlockIndex)
 
 	// Test server error response
 	mux = http.NewServeMux()
-	mux.HandleFunc("/v1/address/get/test-address", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/address/get/test-address/0", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -90,7 +91,7 @@ func TestGetAddressTransactions(t *testing.T) {
 		WithToken("test-token"),
 	)
 	require.NoError(t, err)
-	_, err = client.GetAddressTransactions(context.Background(), "test-address")
+	_, err = client.GetAddressTransactions(context.Background(), "test-address", 0)
 	require.Error(t, err)
 }
 
@@ -107,18 +108,18 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 		WithHTTPClient("test-url", testClient),
 	)
 	require.NoError(t, err)
-	_, err = client.GetAddressTransactionDetails(context.Background(), "")
+	_, err = client.GetAddressTransactionDetails(context.Background(), "", 0)
 	require.Error(t, err)
 	assert.Equal(t, "address cannot be empty", err.Error())
 
 	// Test with nil context
-	_, err = client.GetAddressTransactionDetails(getNilContext(), "test-address")
+	_, err = client.GetAddressTransactionDetails(getNilContext(), "test-address", 0)
 	require.Error(t, err)
 	assert.Equal(t, "context cannot be nil", err.Error())
 
 	// Create test server for successful case
 	mux = http.NewServeMux()
-	mux.HandleFunc("/v1/address/transactions/test-address", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/address/transactions/test-address/0", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "test-token", r.Header.Get("token"))
 
@@ -145,18 +146,18 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 		}
 		json.NewEncoder(w).Encode(transactions)
 	})
-	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
-
-	// Create client with test client
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
 	client, err = New(
-		WithHTTPClient("test-url", testClient),
+		WithHTTPClient(ts.Listener.Addr().String(), http.DefaultClient),
 		WithToken("test-token"),
 		WithVersion("v1"),
+		WithSSL(false),
 	)
 	require.NoError(t, err)
 
 	// Test successful transaction details fetch
-	transactions, err := client.GetAddressTransactionDetails(context.Background(), "test-address")
+	transactions, err := client.GetAddressTransactionDetails(context.Background(), "test-address", 0)
 	require.NoError(t, err)
 	require.Len(t, transactions, 2)
 
@@ -180,7 +181,7 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 
 	// Test server error response
 	mux = http.NewServeMux()
-	mux.HandleFunc("/v1/address/transactions/test-address", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/address/transactions/test-address/0", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	testClient = &http.Client{Transport: localRoundTripper{handler: mux}}
@@ -190,6 +191,6 @@ func TestGetAddressTransactionDetails(t *testing.T) {
 		WithToken("test-token"),
 	)
 	require.NoError(t, err)
-	_, err = client.GetAddressTransactionDetails(context.Background(), "test-address")
+	_, err = client.GetAddressTransactionDetails(context.Background(), "test-address", 0)
 	require.Error(t, err)
 }

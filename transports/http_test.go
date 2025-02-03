@@ -79,6 +79,7 @@ func TestTransportHTTP_GetSubscriptionToken(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	token, err := transport.GetSubscriptionToken(context.Background(), "test-sub")
 	require.NoError(t, err)
@@ -103,6 +104,7 @@ func TestTransportHTTP_RefreshToken(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	token, err := transport.RefreshToken(context.Background())
 	require.NoError(t, err)
@@ -138,6 +140,7 @@ func TestTransportHTTP_Login(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	err := transport.Login(context.Background(), "testuser", "testpass")
 	require.NoError(t, err)
@@ -164,6 +167,7 @@ func TestTransportHTTP_GetTransaction(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	tx, err := transport.GetTransaction(context.Background(), "test-tx")
 	require.NoError(t, err)
@@ -172,12 +176,18 @@ func TestTransportHTTP_GetTransaction(t *testing.T) {
 
 func TestTransportHTTP_GetAddressTransactions(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v1/address/get/test-addr", r.URL.Path)
+		assert.Equal(t, "/v1/address/get/test-addr/0", r.URL.Path)
 		assert.Equal(t, http.MethodGet, r.Method)
-
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode([]*models.Address{
-			{Address: "test-addr"},
+		if err := json.NewEncoder(w).Encode([]*models.AddressTx{
+			{
+				ID:            "test-id",
+				TransactionID: "test-tx-id",
+				BlockHeight:   0,
+				BlockHash:     "test-block-hash",
+				BlockIndex:    1,
+				BlockPage:     0,
+			},
 		}); err != nil {
 			t.Error(err)
 			return
@@ -190,16 +200,17 @@ func TestTransportHTTP_GetAddressTransactions(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
-	addrs, err := transport.GetAddressTransactions(context.Background(), "test-addr")
+	addrs, err := transport.GetAddressTransactions(context.Background(), "test-addr", 0)
 	require.NoError(t, err)
 	assert.Len(t, addrs, 1)
-	assert.Equal(t, "test-addr", addrs[0].Address)
+	assert.Equal(t, "test-tx-id", addrs[0].TransactionID)
 }
 
 func TestTransportHTTP_GetAddressTransactionDetails(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v1/address/transactions/test-addr", r.URL.Path)
+		assert.Equal(t, "/v1/address/transactions/test-addr/0", r.URL.Path)
 		assert.Equal(t, http.MethodGet, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -217,11 +228,13 @@ func TestTransportHTTP_GetAddressTransactionDetails(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
-	txs, err := transport.GetAddressTransactionDetails(context.Background(), "test-addr")
+	transactions, err := transport.GetAddressTransactionDetails(context.Background(), "test-addr", 0)
 	require.NoError(t, err)
-	assert.Len(t, txs, 1)
-	assert.Equal(t, "test-tx", txs[0].ID)
+	assert.NotNil(t, transactions)
+	assert.Len(t, transactions, 1)
+	assert.Equal(t, "test-tx", transactions[0].ID)
 }
 
 func TestTransportHTTP_GetBlockHeader(t *testing.T) {
@@ -244,6 +257,7 @@ func TestTransportHTTP_GetBlockHeader(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	header, err := transport.GetBlockHeader(context.Background(), "123")
 	require.NoError(t, err)
@@ -272,6 +286,7 @@ func TestTransportHTTP_GetBlockHeaders(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	headers, err := transport.GetBlockHeaders(context.Background(), "123", 10)
 	require.NoError(t, err)
@@ -291,6 +306,7 @@ func TestTransportHTTP_ErrorHandling(t *testing.T) {
 		httpClient: http.DefaultClient,
 		version:    "v1",
 	}
+	transport.useSSL = false
 
 	_, err := transport.GetTransaction(context.Background(), "test-tx")
 	require.Error(t, err)
@@ -318,4 +334,33 @@ func TestTransportHTTP_GetVersion(t *testing.T) {
 	if version != "v1.2.3" {
 		t.Errorf("Expected version to be v1.2.3, got %s", version)
 	}
+}
+
+func TestTransportHTTP_GetChainTip(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/block_header/tip", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(&models.BlockHeader{
+			Hash:   "test-tip-hash",
+			Height: 123456,
+		}); err != nil {
+			t.Error(err)
+			return
+		}
+	}))
+	defer ts.Close()
+
+	transport := &TransportHTTP{
+		server:     ts.Listener.Addr().String(),
+		httpClient: http.DefaultClient,
+		version:    "v1",
+	}
+	transport.useSSL = false
+
+	header, err := transport.GetChainTip(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "test-tip-hash", header.Hash)
+	assert.Equal(t, uint32(123456), header.Height)
 }

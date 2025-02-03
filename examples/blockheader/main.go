@@ -20,16 +20,28 @@ func main() {
 
 	argsWithoutProg := os.Args[1:]
 	if len(argsWithoutProg) == 0 {
-		panic("no block header given")
+		// If no block is specified, get the chain tip
+		var blockHeader *models.BlockHeader
+		if blockHeader, err = junglebusClient.GetChainTip(context.Background()); err != nil {
+			log.Printf("ERROR: failed getting chain tip %s", err.Error())
+		} else if blockHeader != nil {
+			j, _ := json.Marshal(blockHeader)
+			log.Printf("Got chain tip %s", string(j))
+		} else {
+			log.Printf("ERROR: chain tip is nil")
+		}
+		os.Exit(0)
 	}
-	block := argsWithoutProg[0]
 
+	block := argsWithoutProg[0]
 	var blockHeader *models.BlockHeader
 	if blockHeader, err = junglebusClient.GetBlockHeader(context.Background(), block); err != nil {
 		log.Printf("ERROR: failed getting block header %s", err.Error())
-	} else {
+	} else if blockHeader != nil {
 		j, _ := json.Marshal(blockHeader)
 		log.Printf("Got block header %s", string(j))
+	} else {
+		log.Printf("ERROR: block header is nil")
 	}
 	os.Exit(0)
 }

@@ -28,3 +28,11 @@ func (jb *Client) GetBlockHeaders(ctx context.Context, fromBlock string, limit u
 	}
 	return jb.transport.GetBlockHeaders(ctx, fromBlock, limit)
 }
+
+// GetChainTip get the current chain tip block header
+func (jb *Client) GetChainTip(ctx context.Context) (*models.BlockHeader, error) {
+	if ctx == nil {
+		return nil, errors.New("context cannot be nil")
+	}
+	return jb.transport.GetChainTip(ctx)
+}

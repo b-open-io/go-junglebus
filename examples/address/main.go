@@ -24,8 +24,8 @@ func main() {
 	}
 	address := argsWithoutProg[0]
 
-	var addr []*models.Address
-	if addr, err = junglebusClient.GetAddressTransactions(context.Background(), address); err != nil {
+	var addr []*models.AddressTx
+	if addr, err = junglebusClient.GetAddressTransactions(context.Background(), address, 0); err != nil {
 		log.Printf("ERROR: failed getting address transactions %s", err.Error())
 	} else {
 		j, _ := json.Marshal(addr)

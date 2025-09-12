@@ -164,32 +164,24 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 	})
 
 	centrifugeClient.OnConnecting(func(e centrifuge.ConnectingEvent) {
+		// Report connection status (connecting or reconnecting)
+		status := "connecting"
+		message := "Connecting to server"
 		if jb.subscription != nil {
-			for _, sub := range subs.subscriptions {
-				sub.Unsubscribe()
-			}
-			subs.wg.Wait()
-			eventHandler.OnStatus(&models.ControlResponse{
-				StatusCode: uint32(StatusConnecting),
-				Status:     "reconnecting",
-				Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
-			})
-			_ = jb.Unsubscribe()
-			time.Sleep(1 * time.Second)
-			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
-			if err != nil {
-				eventHandler.OnError(err)
-			}
-			return
+			status = "reconnecting"
+			message = fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage)
 		}
-
-		jb.subscription = subs
 
 		eventHandler.OnStatus(&models.ControlResponse{
 			StatusCode: uint32(StatusConnecting),
-			Status:     "connecting",
-			Message:    "Connecting to server",
+			Status:     status,
+			Message:    message,
 		})
+
+		// Set subscription reference for first connection
+		if jb.subscription == nil {
+			jb.subscription = subs
+		}
 	})
 
 	centrifugeClient.OnConnected(func(e centrifuge.ConnectedEvent) {

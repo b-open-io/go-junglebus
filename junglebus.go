@@ -7,6 +7,8 @@
 package junglebus
 
 import (
+	"sync"
+
 	"github.com/GorillaPool/go-junglebus/transports"
 )
 
@@ -20,6 +22,7 @@ type Client struct {
 	transports.TransportService
 	transport        transports.TransportService
 	transportOptions []transports.ClientOps
+	mu               sync.RWMutex
 	subscription     *Subscription
 	debug            bool
 }

@@ -9,7 +9,7 @@ package junglebus
 import (
 	"sync"
 
-	"github.com/GorillaPool/go-junglebus/transports"
+	"github.com/b-open-io/go-junglebus/transports"
 )
 
 var DefaultServer = "junglebus.gorillapool.io"

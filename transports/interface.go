@@ -3,12 +3,12 @@ package transports
 import (
 	"context"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // AddressService is the address related requests
 type AddressService interface {
-	GetAddressTransactions(ctx context.Context, address string) ([]*models.Address, error)
+	GetAddressTransactions(ctx context.Context, address string, from uint32) ([]*models.Address, error)
 	GetAddressTransactionDetails(ctx context.Context, address string) ([]*models.Transaction, error)
 }
 
@@ -21,6 +21,8 @@ type BlockHeaderService interface {
 // TransactionService is the transaction related requests
 type TransactionService interface {
 	GetTransaction(ctx context.Context, txID string) (*models.Transaction, error)
+	GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error)
+	GetSpend(ctx context.Context, txID string, vout uint32) ([]byte, error)
 }
 
 // TransportService the transport service interface

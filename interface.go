@@ -1,7 +1,7 @@
 package junglebus
 
 import (
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // StatusCode defines the codes that can be returned from the control channel of a subscription

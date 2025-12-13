@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 // TransportHTTP is the struct for HTTP
@@ -139,9 +139,11 @@ func (h *TransportHTTP) GetTransaction(ctx context.Context, txID string) (transa
 }
 
 // GetAddressTransactions will get the metadata of all transaction related to the given address
-func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string) (addr []*models.Address, err error) {
+// from is optional - pass 0 to get all transactions, or a block height to start from
+func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string, from uint32) (addr []*models.Address, err error) {
+	path := fmt.Sprintf("/address/get/%s?from=%d", address, from)
 	if err = h.doHTTPRequest(
-		ctx, http.MethodGet, "/address/get/"+address, nil, &addr,
+		ctx, http.MethodGet, path, nil, &addr,
 	); err != nil {
 		return nil, err
 	}
@@ -197,6 +199,28 @@ func (h *TransportHTTP) GetBlockHeaders(ctx context.Context, fromBlock string, l
 	}
 
 	return blockHeaders, nil
+}
+
+// GetTxo retrieves the raw transaction output data for the given outpoint
+func (h *TransportHTTP) GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error) {
+	var result []byte
+	if err := h.doHTTPRequest(
+		ctx, http.MethodGet, fmt.Sprintf("/txo/get/%s/%d", txID, vout), nil, &result,
+	); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetSpend retrieves the spending transaction ID for the given outpoint
+func (h *TransportHTTP) GetSpend(ctx context.Context, txID string, vout uint32) ([]byte, error) {
+	var result []byte
+	if err := h.doHTTPRequest(
+		ctx, http.MethodGet, fmt.Sprintf("/spend/get/%s/%d", txID, vout), nil, &result,
+	); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // doHTTPRequest will create and submit the HTTP request

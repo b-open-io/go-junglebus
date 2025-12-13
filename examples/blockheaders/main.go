@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GorillaPool/go-junglebus"
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus"
+	"github.com/b-open-io/go-junglebus/models"
 )
 
 func main() {

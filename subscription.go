@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GorillaPool/go-junglebus/models"
+	"github.com/b-open-io/go-junglebus/models"
 	"github.com/centrifugal/centrifuge-go"
 	"google.golang.org/protobuf/proto"
 )

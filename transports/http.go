@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -138,6 +139,21 @@ func (h *TransportHTTP) GetTransaction(ctx context.Context, txID string) (transa
 	return transaction, nil
 }
 
+// GetRawTransaction will get the raw transaction bytes by ID
+func (h *TransportHTTP) GetRawTransaction(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/get/"+txID+"/bin")
+}
+
+// GetBeef will get a transaction in BEEF format by ID
+func (h *TransportHTTP) GetBeef(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/beef/"+txID)
+}
+
+// GetProof will get the merkle proof for a transaction by ID
+func (h *TransportHTTP) GetProof(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/proof/"+txID+"/bin")
+}
+
 // GetAddressTransactions will get the metadata of all transaction related to the given address
 // from is optional - pass 0 to get all transactions, or a block height to start from
 func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string, from uint32) (addr []*models.Address, err error) {
@@ -252,4 +268,37 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 	}
 
 	return json.NewDecoder(resp.Body).Decode(&responseJSON)
+}
+
+// doHTTPRequestBinary will create and submit an HTTP request returning binary data
+func (h *TransportHTTP) doHTTPRequestBinary(ctx context.Context, method string, path string) ([]byte, error) {
+
+	protocol := "https"
+	if !h.useSSL {
+		protocol = "http"
+	}
+	serverRequest := fmt.Sprintf("%s://%s/%s%s", protocol, h.server, h.version, path)
+	req, err := http.NewRequestWithContext(ctx, method, serverRequest, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("token", h.token)
+
+	var resp *http.Response
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	if resp, err = h.httpClient.Do(req); err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
 }

@@ -21,6 +21,9 @@ type BlockHeaderService interface {
 // TransactionService is the transaction related requests
 type TransactionService interface {
 	GetTransaction(ctx context.Context, txID string) (*models.Transaction, error)
+	GetRawTransaction(ctx context.Context, txID string) ([]byte, error)
+	GetBeef(ctx context.Context, txID string) ([]byte, error)
+	GetProof(ctx context.Context, txID string) ([]byte, error)
 	GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error)
 	GetSpend(ctx context.Context, txID string, vout uint32) ([]byte, error)
 }

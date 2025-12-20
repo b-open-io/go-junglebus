@@ -219,24 +219,12 @@ func (h *TransportHTTP) GetBlockHeaders(ctx context.Context, fromBlock string, l
 
 // GetTxo retrieves the raw transaction output data for the given outpoint
 func (h *TransportHTTP) GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error) {
-	var result []byte
-	if err := h.doHTTPRequest(
-		ctx, http.MethodGet, fmt.Sprintf("/txo/get/%s/%d", txID, vout), nil, &result,
-	); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/get/%s_%d", txID, vout))
 }
 
 // GetSpend retrieves the spending transaction ID for the given outpoint
 func (h *TransportHTTP) GetSpend(ctx context.Context, txID string, vout uint32) ([]byte, error) {
-	var result []byte
-	if err := h.doHTTPRequest(
-		ctx, http.MethodGet, fmt.Sprintf("/spend/get/%s/%d", txID, vout), nil, &result,
-	); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/spend/%s_%d", txID, vout))
 }
 
 // doHTTPRequest will create and submit the HTTP request

@@ -1,9 +1,10 @@
+---
 name: Feature request
 description: Got a new feature, improvment or idea?
 title: "[Feature]: "
 labels: [feature]
 assignees:
-  - mrz1836
+  - rohenaz
 body:
   - type: textarea
     id: what-feature

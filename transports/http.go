@@ -91,6 +91,11 @@ func (h *TransportHTTP) SetVersion(version string) {
 	h.version = version
 }
 
+// GetVersion gets the version used for all calls
+func (h *TransportHTTP) GetVersion() string {
+	return h.version
+}
+
 // GetServerURL get the server URL for this transport
 func (h *TransportHTTP) GetServerURL() string {
 	return h.server
@@ -155,33 +160,26 @@ func (h *TransportHTTP) GetProof(ctx context.Context, txID string) ([]byte, erro
 }
 
 // GetAddressTransactions will get the metadata of all transaction related to the given address
-// from is optional - pass 0 to get all transactions, or a block height to start from
-func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string, from uint32) (addr []*models.Address, err error) {
-	path := fmt.Sprintf("/address/get/%s?from=%d", address, from)
-	if err = h.doHTTPRequest(
-		ctx, http.MethodGet, path, nil, &addr,
-	); err != nil {
+func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string, fromHeight uint32) (addr []*models.AddressTx, err error) {
+	url := fmt.Sprintf("/address/get/%s/%d", address, fromHeight)
+	if err = h.doHTTPRequest(ctx, http.MethodGet, url, nil, &addr); err != nil {
 		return nil, err
 	}
 	if h.debug {
 		log.Printf("Address transactions: %v\n", addr)
 	}
-
 	return addr, nil
 }
 
 // GetAddressTransactionDetails will get all transactions related to the given address
-func (h *TransportHTTP) GetAddressTransactionDetails(ctx context.Context, address string) (transactions []*models.Transaction, err error) {
-
-	if err = h.doHTTPRequest(
-		ctx, http.MethodGet, "/address/transactions/"+address, nil, &transactions,
-	); err != nil {
+func (h *TransportHTTP) GetAddressTransactionDetails(ctx context.Context, address string, fromHeight uint32) (transactions []*models.Transaction, err error) {
+	url := fmt.Sprintf("/address/transactions/%s/%d", address, fromHeight)
+	if err = h.doHTTPRequest(ctx, http.MethodGet, url, nil, &transactions); err != nil {
 		return nil, err
 	}
 	if h.debug {
 		log.Printf("transactions: %d\n", len(transactions))
 	}
-
 	return transactions, nil
 }
 
@@ -217,6 +215,30 @@ func (h *TransportHTTP) GetBlockHeaders(ctx context.Context, fromBlock string, l
 	return blockHeaders, nil
 }
 
+func (h *TransportHTTP) GetFromBlock(ctx context.Context, subscriptionID string, height uint32, lastIdx uint64) ([]*models.Transaction, error) {
+	url := fmt.Sprintf("/transaction/from_block/%s?height=%d&last_idx=%d", subscriptionID, height, lastIdx)
+	var transactions []*models.Transaction
+	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &transactions); err != nil {
+		return nil, err
+	}
+	if h.debug {
+		log.Printf("GetFromBlock transactions: %d\n", len(transactions))
+	}
+	return transactions, nil
+}
+
+func (h *TransportHTTP) GetLiteFromBlock(ctx context.Context, subscriptionID string, height uint32, lastIdx uint64) ([]*models.TransactionResponse, error) {
+	url := fmt.Sprintf("/transaction/from_block/lite/%s?height=%d&last_idx=%d", subscriptionID, height, lastIdx)
+	var transactions []*models.TransactionResponse
+	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &transactions); err != nil {
+		return nil, err
+	}
+	if h.debug {
+		log.Printf("GetLiteFromBlock transactions: %d\n", len(transactions))
+	}
+	return transactions, nil
+}
+
 // GetTxo retrieves the raw transaction output data for the given outpoint
 func (h *TransportHTTP) GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error) {
 	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/get/%s_%d", txID, vout))
@@ -227,9 +249,33 @@ func (h *TransportHTTP) GetSpend(ctx context.Context, txID string, vout uint32) 
 	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/spend/%s_%d", txID, vout))
 }
 
+func (h *TransportHTTP) GetUser(ctx context.Context) (*models.User, error) {
+	url := "/user/get"
+	var user *models.User
+	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &user); err != nil {
+		return nil, err
+	}
+	if h.debug {
+		log.Printf("GetUser: %v\n", user)
+	}
+	return user, nil
+}
+
+// GetChainTip will get the current chain tip block header
+func (h *TransportHTTP) GetChainTip(ctx context.Context) (blockHeader *models.BlockHeader, err error) {
+	if err = h.doHTTPRequest(
+		ctx, http.MethodGet, "/block_header/tip", nil, &blockHeader,
+	); err != nil {
+		return nil, err
+	}
+	if h.debug {
+		log.Printf("chain tip: %v\n", blockHeader)
+	}
+	return blockHeader, nil
+}
+
 // doHTTPRequest will create and submit the HTTP request
 func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path string, rawJSON []byte, responseJSON interface{}) error {
-
 	protocol := "https"
 	if !h.useSSL {
 		protocol = "http"
@@ -251,11 +297,12 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 	if resp, err = h.httpClient.Do(req); err != nil {
 		return err
 	}
+
 	if resp.StatusCode >= http.StatusBadRequest {
 		return errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(&responseJSON)
+	return json.NewDecoder(resp.Body).Decode(responseJSON)
 }
 
 // doHTTPRequestBinary will create and submit an HTTP request returning binary data

@@ -1,0 +1,26 @@
+name: PR Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.OPENAI_KEY }}" ] || [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "Required secrets are missing!" && exit 1;
+          fi
+      - name: Satchmodamus PR Agent
+        uses: rohenaz/pr-agent@v0.0.1
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

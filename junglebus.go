@@ -3,7 +3,7 @@
 // If you have any suggestions or comments, please feel free to open an issue on
 // this GitHub repository!
 //
-// By GorillaPool (https://githujb.com/GorillaPool)
+// By BOpen (https://githujb.com/b-open-io)
 package junglebus
 
 import (
@@ -29,7 +29,9 @@ type Client struct {
 
 // New create a new jungle bus client
 func New(opts ...ClientOps) (*Client, error) {
-	client := &Client{}
+	client := &Client{
+		transportOptions: make([]transports.ClientOps, 0),
+	}
 
 	client.setDefaultOptions()
 
@@ -41,9 +43,9 @@ func New(opts ...ClientOps) (*Client, error) {
 }
 
 func (jb *Client) setDefaultOptions() {
-	jb.transport, _ = transports.NewTransport(
-		transports.WithHTTP(DefaultServer),
-	)
+	defaultOpt := transports.WithHTTP(DefaultServer)
+	jb.transportOptions = []transports.ClientOps{defaultOpt}
+	jb.transport, _ = transports.NewTransport(defaultOpt)
 }
 
 // SetDebug turn the debugging on or off

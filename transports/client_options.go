@@ -1,3 +1,4 @@
+// Package transports provides transport layer implementations for the JungleBus client
 package transports
 
 import (

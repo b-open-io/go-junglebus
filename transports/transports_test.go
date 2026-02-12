@@ -24,7 +24,7 @@ func TestWithDebugging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, c)
 
-		assert.Equal(t, false, c.IsDebug())
+		assert.False(t, c.IsDebug())
 	})
 
 	t.Run("debug true", func(t *testing.T) {
@@ -36,6 +36,24 @@ func TestWithDebugging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, c)
 
-		assert.Equal(t, true, c.IsDebug())
+		assert.True(t, c.IsDebug())
+	})
+
+	t.Run("set debug", func(t *testing.T) {
+		opts := []ClientOps{
+			WithDebugging(false),
+			WithHTTP(""),
+		}
+		c, err := NewTransport(opts...)
+		require.NoError(t, err)
+		require.NotNil(t, c)
+
+		// Test setting debug to false
+		c.SetDebug(false)
+		assert.False(t, c.IsDebug())
+
+		// Test setting debug to true
+		c.SetDebug(true)
+		assert.True(t, c.IsDebug())
 	})
 }

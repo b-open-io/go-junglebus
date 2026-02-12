@@ -10,10 +10,11 @@ import (
 func WithHTTP(serverURL string) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transport, _ = transports.NewTransport(
+			transport, _ := transports.NewTransport(
 				transports.WithHTTP(serverURL),
+				transports.WithDebugging(c.debug),
 			)
-			// c.transportOptions = append(c.transportOptions, transports.WithHTTP(serverURL))
+			c.transport = transport
 		}
 	}
 }
@@ -22,7 +23,11 @@ func WithHTTP(serverURL string) ClientOps {
 func WithHTTPClient(serverURL string, httpClient *http.Client) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transportOptions = append(c.transportOptions, transports.WithHTTPClient(serverURL, httpClient))
+			transport, _ := transports.NewTransport(
+				transports.WithHTTPClient(serverURL, httpClient),
+				transports.WithDebugging(c.debug),
+			)
+			c.transport = transport
 		}
 	}
 }
@@ -31,7 +36,9 @@ func WithHTTPClient(serverURL string, httpClient *http.Client) ClientOps {
 func WithToken(token string) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transportOptions = append(c.transportOptions, transports.WithToken(token))
+			if c.transport != nil {
+				c.transport.SetToken(token)
+			}
 		}
 	}
 }
@@ -40,7 +47,10 @@ func WithToken(token string) ClientOps {
 func WithDebugging(debug bool) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transportOptions = append(c.transportOptions, transports.WithDebugging(debug))
+			c.debug = debug
+			if c.transport != nil {
+				c.transport.SetDebug(debug)
+			}
 		}
 	}
 }
@@ -49,7 +59,9 @@ func WithDebugging(debug bool) ClientOps {
 func WithSSL(useSSL bool) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transportOptions = append(c.transportOptions, transports.WithSSL(useSSL))
+			if c.transport != nil {
+				c.transport.UseSSL(useSSL)
+			}
 		}
 	}
 }
@@ -58,7 +70,9 @@ func WithSSL(useSSL bool) ClientOps {
 func WithVersion(version string) ClientOps {
 	return func(c *Client) {
 		if c != nil {
-			c.transportOptions = append(c.transportOptions, transports.WithVersion(version))
+			if c.transport != nil {
+				c.transport.SetVersion(version)
+			}
 		}
 	}
 }

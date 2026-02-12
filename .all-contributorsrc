@@ -1,6 +1,6 @@
 {
   "projectName": "go-junglebus",
-  "projectOwner": "GorillaPool",
+  "projectOwner": "b-open-io",
   "repoType": "github",
   "repoHost": "https://github.com",
   "files": [
@@ -13,10 +13,10 @@
   "contributorsSortAlphabetically": false,
   "contributors": [
       {
-        "login": "mrz1836",
-        "name": "Mr. Z",
-        "avatar_url": "https://avatars.githubusercontent.com/u/3743002?v=4",
-        "profile": "https://mrz1818.com",
+        "login": "rohenaz",
+        "name": "Satchmo",
+        "avatar_url": "https://avatars.githubusercontent.com/u/456719?v=4",
+        "profile": "https://github.com/rohenaz",
         "contributions": [
           "infra",
           "code",

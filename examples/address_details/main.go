@@ -24,12 +24,12 @@ func main() {
 	}
 	address := argsWithoutProg[0]
 
-	var addr []*models.Transaction
-	if addr, err = junglebusClient.GetAddressTransactionDetails(context.Background(), address); err != nil {
-		log.Printf("ERROR: failed getting address transactions %s", err.Error())
+	var txs []*models.Transaction
+	if txs, err = junglebusClient.GetAddressTransactionDetails(context.Background(), address, 0); err != nil {
+		log.Printf("ERROR: failed getting address details %s", err.Error())
 	} else {
-		j, _ := json.Marshal(addr)
-		log.Printf("Got address %s", string(j))
+		j, _ := json.Marshal(txs)
+		log.Printf("Got address details %s", string(j))
 	}
 	os.Exit(0)
 }

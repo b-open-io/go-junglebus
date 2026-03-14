@@ -2,8 +2,9 @@ package transports
 
 // Client is the transport client
 type Client struct {
-	debug     bool
-	transport TransportService
+	debug                 bool
+	transport             TransportService
+	maxConcurrentRequests int
 }
 
 // ClientOps are the client options functions

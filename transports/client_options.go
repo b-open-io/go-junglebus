@@ -39,12 +39,18 @@ func initHTTPTransport(c *Client, serverURL string, httpClient *http.Client) {
 	serverURL = regexReplaceHTTPS.ReplaceAllString(serverURL, "")
 	serverURL = regexReplaceWSS.ReplaceAllString(serverURL, "")
 
+	maxConcurrent := c.maxConcurrentRequests
+	if maxConcurrent == 0 {
+		maxConcurrent = DefaultMaxConcurrentRequests
+	}
+
 	c.transport = NewTransportService(&TransportHTTP{
 		debug:      c.debug,
 		server:     serverURL,
 		httpClient: httpClient,
 		useSSL:     useSSL,
 		version:    "v1",
+		limiter:    make(chan struct{}, maxConcurrent),
 	})
 }
 
@@ -89,6 +95,16 @@ func WithVersion(version string) ClientOps {
 			if c.transport != nil {
 				c.transport.SetVersion(version)
 			}
+		}
+	}
+}
+
+// WithMaxConcurrentRequests sets the maximum number of concurrent HTTP requests.
+// Defaults to DefaultMaxConcurrentRequests (8) if not set or if n <= 0.
+func WithMaxConcurrentRequests(n int) ClientOps {
+	return func(c *Client) {
+		if c != nil {
+			c.maxConcurrentRequests = n
 		}
 	}
 }

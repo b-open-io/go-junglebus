@@ -57,6 +57,7 @@ type TransportService interface {
 	IsSSL() bool
 	GetServerURL() string
 	GetUser(ctx context.Context) (*models.User, error)
+	SetMaxConcurrentRequests(n int)
 }
 
 // LoginResponse response from server on login or token refresh

@@ -76,3 +76,13 @@ func WithVersion(version string) ClientOps {
 		}
 	}
 }
+
+// WithMaxConcurrentRequests sets the maximum number of concurrent HTTP requests.
+// Defaults to 8 if not set.
+func WithMaxConcurrentRequests(n int) ClientOps {
+	return func(c *Client) {
+		if c != nil && c.transport != nil {
+			c.transport.SetMaxConcurrentRequests(n)
+		}
+	}
+}

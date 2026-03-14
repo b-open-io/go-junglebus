@@ -34,12 +34,14 @@ func newTestEventHandler() (EventHandler, *bool, *bool, *bool) {
 	}, &onTransactionCalled, &onMempoolCalled, &onStatusCalled
 }
 
-func TestSubscription_HandlePubChan(t *testing.T) {
+func TestSubscription_HandleEvents(t *testing.T) {
 	t.Run("handle control message", func(t *testing.T) {
 		handler, _, _, onStatusCalled := newTestEventHandler()
 		sub := &Subscription{
 			EventHandler: handler,
-			pubChan:      make(chan *pubEvent),
+			eventQueue:   newEventQueue(100),
+			position:     newPosition(0, 0),
+			options:      &SubscribeOptions{},
 		}
 
 		// Create a control message
@@ -51,7 +53,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		require.NoError(t, err)
 
 		// Start handling messages
-		go sub.handlePubChan(&SubscribeOptions{})
+		go sub.handleEvents()
 
 		// Send a control message
 		sub.addToQueue(&pubEvent{
@@ -59,9 +61,9 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 			Data:    statusData,
 		})
 
-		// Close the channel to stop the handler
-		close(sub.pubChan)
-		sub.wg.Wait()
+		// Close the queue and wait for processing
+		sub.eventQueue.Close()
+		sub.eventQueue.Wait()
 
 		assert.True(t, *onStatusCalled)
 	})
@@ -74,7 +76,9 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		sub := &Subscription{
 			EventHandler: handler,
 			client:       client,
-			pubChan:      make(chan *pubEvent),
+			eventQueue:   newEventQueue(100),
+			position:     newPosition(0, 0),
+			options:      &SubscribeOptions{},
 		}
 
 		// Create a transaction message
@@ -87,7 +91,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		require.NoError(t, err)
 
 		// Start handling messages
-		go sub.handlePubChan(&SubscribeOptions{})
+		go sub.handleEvents()
 
 		// Send a transaction message
 		sub.addToQueue(&pubEvent{
@@ -95,9 +99,9 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 			Data:    txData,
 		})
 
-		// Close the channel to stop the handler
-		close(sub.pubChan)
-		sub.wg.Wait()
+		// Close the queue and wait for processing
+		sub.eventQueue.Close()
+		sub.eventQueue.Wait()
 
 		assert.True(t, *onTransactionCalled)
 	})
@@ -110,7 +114,9 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		sub := &Subscription{
 			EventHandler: handler,
 			client:       client,
-			pubChan:      make(chan *pubEvent),
+			eventQueue:   newEventQueue(100),
+			position:     newPosition(0, 0),
+			options:      &SubscribeOptions{},
 		}
 
 		// Create a mempool message
@@ -123,7 +129,7 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 		require.NoError(t, err)
 
 		// Start handling messages
-		go sub.handlePubChan(&SubscribeOptions{})
+		go sub.handleEvents()
 
 		// Send a mempool message
 		sub.addToQueue(&pubEvent{
@@ -131,9 +137,9 @@ func TestSubscription_HandlePubChan(t *testing.T) {
 			Data:    txData,
 		})
 
-		// Close the channel to stop the handler
-		close(sub.pubChan)
-		sub.wg.Wait()
+		// Close the queue and wait for processing
+		sub.eventQueue.Close()
+		sub.eventQueue.Wait()
 
 		require.True(t, *onMempoolCalled)
 	})
@@ -327,48 +333,55 @@ func TestSubscribeWithQueue(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestStartSubscription(t *testing.T) {
-	// Create a subscription directly
-	sub := &Subscription{
-		SubscriptionID: "test-sub",
-		subscriptions:  make(map[string]*centrifuge.Subscription),
-		pubChan:        make(chan *pubEvent),
-	}
+func TestEventQueue(t *testing.T) {
+	q := newEventQueue(10)
 
-	// Test start subscription with empty channel
-	centrifugeSub, err := sub.startSubscription("")
-	require.Error(t, err)
-	assert.Nil(t, centrifugeSub)
-	assert.Equal(t, "subscription channel cannot be empty", err.Error())
+	// Test sending an event
+	event := &pubEvent{Channel: "test", Data: []byte("data")}
+	ok := q.Send(event)
+	require.True(t, ok)
+	assert.Equal(t, 1, q.Len())
+
+	// Drain and mark done
+	e := <-q.Channel()
+	assert.Equal(t, event.Channel, e.Channel)
+	q.Done()
+
+	// Test close
+	q.Close()
+	assert.True(t, q.IsClosed())
+
+	// Send after close should fail
+	ok = q.Send(&pubEvent{Channel: "after-close"})
+	assert.False(t, ok)
 }
 
 func TestAddToQueue(t *testing.T) {
-	// Create a subscription directly
 	sub := &Subscription{
 		SubscriptionID: "test-sub",
-		subscriptions:  make(map[string]*centrifuge.Subscription),
-		pubChan:        make(chan *pubEvent, 1), // Buffer size of 1 to avoid blocking
+		eventQueue:     newEventQueue(10),
+		position:       newPosition(0, 0),
+		options:        &SubscribeOptions{},
 	}
 
-	// Create a test event
 	event := &pubEvent{
 		Channel: "test-channel",
 		Data:    []byte("test-data"),
 	}
 
-	// Start a goroutine to handle messages
+	// Start a goroutine to consume from the queue
 	go func() {
-		e := <-sub.pubChan
+		e := <-sub.eventQueue.Channel()
 		assert.Equal(t, event.Channel, e.Channel)
 		assert.Equal(t, event.Data, e.Data)
-		sub.wg.Done()
+		sub.eventQueue.Done()
 	}()
 
 	// Add event to queue
 	sub.addToQueue(event)
 
 	// Wait for message to be processed
-	sub.wg.Wait()
+	sub.eventQueue.Wait()
 }
 
 func TestSetDebug(t *testing.T) {

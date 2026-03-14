@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -154,6 +155,21 @@ func (h *TransportHTTP) GetTransaction(ctx context.Context, txID string) (transa
 	return transaction, nil
 }
 
+// GetRawTransaction will get the raw transaction bytes by ID
+func (h *TransportHTTP) GetRawTransaction(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/get/"+txID+"/bin")
+}
+
+// GetBeef will get a transaction in BEEF format by ID
+func (h *TransportHTTP) GetBeef(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/beef/"+txID)
+}
+
+// GetProof will get the merkle proof for a transaction by ID
+func (h *TransportHTTP) GetProof(ctx context.Context, txID string) ([]byte, error) {
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, "/transaction/proof/"+txID+"/bin")
+}
+
 // GetAddressTransactions will get the metadata of all transaction related to the given address
 func (h *TransportHTTP) GetAddressTransactions(ctx context.Context, address string, fromHeight uint32) (addr []*models.AddressTx, err error) {
 	url := fmt.Sprintf("/address/get/%s/%d", address, fromHeight)
@@ -210,20 +226,6 @@ func (h *TransportHTTP) GetBlockHeaders(ctx context.Context, fromBlock string, l
 	return blockHeaders, nil
 }
 
-/* Missing methods added to fully implement TransportService */
-
-func (h *TransportHTTP) GetRawTransaction(ctx context.Context, txID string) ([]byte, error) {
-	url := "/transaction/raw/" + txID
-	var raw []byte
-	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &raw); err != nil {
-		return nil, err
-	}
-	if h.debug {
-		log.Printf("Raw transaction: %v\n", raw)
-	}
-	return raw, nil
-}
-
 func (h *TransportHTTP) GetFromBlock(ctx context.Context, subscriptionID string, height uint32, lastIdx uint64) ([]*models.Transaction, error) {
 	url := fmt.Sprintf("/transaction/from_block/%s?height=%d&last_idx=%d", subscriptionID, height, lastIdx)
 	var transactions []*models.Transaction
@@ -248,28 +250,14 @@ func (h *TransportHTTP) GetLiteFromBlock(ctx context.Context, subscriptionID str
 	return transactions, nil
 }
 
+// GetTxo retrieves the raw transaction output data for the given outpoint
 func (h *TransportHTTP) GetTxo(ctx context.Context, txID string, vout uint32) ([]byte, error) {
-	url := fmt.Sprintf("/txo/get/%s/%d", txID, vout)
-	var data []byte
-	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &data); err != nil {
-		return nil, err
-	}
-	if h.debug {
-		log.Printf("GetTxo: %v\n", data)
-	}
-	return data, nil
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/get/%s_%d", txID, vout))
 }
 
+// GetSpend retrieves the spending transaction ID for the given outpoint
 func (h *TransportHTTP) GetSpend(ctx context.Context, txID string, vout uint32) ([]byte, error) {
-	url := fmt.Sprintf("/txo/spend/%s/%d", txID, vout)
-	var data []byte
-	if err := h.doHTTPRequest(ctx, http.MethodGet, url, nil, &data); err != nil {
-		return nil, err
-	}
-	if h.debug {
-		log.Printf("GetSpend: %v\n", data)
-	}
-	return data, nil
+	return h.doHTTPRequestBinary(ctx, http.MethodGet, fmt.Sprintf("/txo/spend/%s_%d", txID, vout))
 }
 
 func (h *TransportHTTP) GetUser(ctx context.Context) (*models.User, error) {
@@ -351,4 +339,37 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 	}
 
 	return json.NewDecoder(resp.Body).Decode(responseJSON)
+}
+
+// doHTTPRequestBinary will create and submit an HTTP request returning binary data
+func (h *TransportHTTP) doHTTPRequestBinary(ctx context.Context, method string, path string) ([]byte, error) {
+
+	protocol := "https"
+	if !h.useSSL {
+		protocol = "http"
+	}
+	serverRequest := fmt.Sprintf("%s://%s/%s%s", protocol, h.server, h.version, path)
+	req, err := http.NewRequestWithContext(ctx, method, serverRequest, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("token", h.token)
+
+	var resp *http.Response
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	if resp, err = h.httpClient.Do(req); err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
 }

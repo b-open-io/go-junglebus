@@ -1,11 +1,7 @@
 package junglebus
 
 import (
-	"context"
-	"log"
-
 	"github.com/b-open-io/go-junglebus/models"
-	"github.com/centrifugal/centrifuge-go"
 )
 
 // StatusCode defines the codes that can be returned from the control channel of a subscription
@@ -44,28 +40,10 @@ var (
 	StatusError StatusCode = 999
 )
 
+// EventHandler contains callbacks for subscription events
 type EventHandler struct {
 	OnTransaction func(tx *models.TransactionResponse)
 	OnMempool     func(tx *models.TransactionResponse)
 	OnStatus      func(response *models.ControlResponse)
 	OnError       func(err error)
-	ctx           context.Context
-	debug         bool
-}
-
-func (e *EventHandler) OnPublish(event centrifuge.PublicationEvent) {
-	if e.debug {
-		log.Printf("[DEBUG] OnPublish event received: %+v", event)
-	}
-
-	// Use context for cancellation if needed
-	if e.ctx != nil && e.ctx.Err() != nil {
-		if e.OnError != nil {
-			e.OnError(e.ctx.Err())
-		}
-		return
-	}
-
-	// Process the event based on the data
-	// Implementation depends on the specific requirements
 }

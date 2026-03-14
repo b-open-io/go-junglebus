@@ -13,6 +13,8 @@ import (
 	"github.com/b-open-io/go-junglebus/models"
 )
 
+const DefaultMaxConcurrentRequests = 8
+
 // TransportHTTP is the struct for HTTP
 type TransportHTTP struct {
 	debug      bool
@@ -21,6 +23,7 @@ type TransportHTTP struct {
 	token      string
 	useSSL     bool
 	version    string
+	limiter    chan struct{}
 }
 
 // SetDebug turn the debugging on or off
@@ -98,6 +101,14 @@ func (h *TransportHTTP) GetVersion() string {
 // GetServerURL get the server URL for this transport
 func (h *TransportHTTP) GetServerURL() string {
 	return h.server
+}
+
+// SetMaxConcurrentRequests sets the maximum number of concurrent HTTP requests.
+func (h *TransportHTTP) SetMaxConcurrentRequests(n int) {
+	if n <= 0 {
+		n = DefaultMaxConcurrentRequests
+	}
+	h.limiter = make(chan struct{}, n)
 }
 
 func (h *TransportHTTP) Login(ctx context.Context, username string, password string) error {
@@ -286,8 +297,33 @@ func (h *TransportHTTP) GetChainTip(ctx context.Context) (blockHeader *models.Bl
 	return blockHeader, nil
 }
 
+// acquire blocks until a limiter slot is available or context is cancelled.
+func (h *TransportHTTP) acquire(ctx context.Context) error {
+	if h.limiter == nil {
+		return nil
+	}
+	select {
+	case h.limiter <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// release returns a limiter slot.
+func (h *TransportHTTP) release() {
+	if h.limiter != nil {
+		<-h.limiter
+	}
+}
+
 // doHTTPRequest will create and submit the HTTP request
 func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path string, rawJSON []byte, responseJSON interface{}) error {
+	if err := h.acquire(ctx); err != nil {
+		return err
+	}
+	defer h.release()
+
 	protocol := "https"
 	if !h.useSSL {
 		protocol = "http"

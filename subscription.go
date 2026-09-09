@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/GorillaPool/go-junglebus/models"
@@ -24,6 +25,7 @@ type Subscription struct {
 	pubChan          chan *pubEvent
 	wg               sync.WaitGroup
 	closed           bool
+	reconnecting     int32
 }
 
 type pubEvent struct {
@@ -165,21 +167,28 @@ func (jb *Client) SubscribeWithQueue(ctx context.Context, subscriptionID string,
 
 	centrifugeClient.OnConnecting(func(e centrifuge.ConnectingEvent) {
 		if jb.subscription != nil {
-			for _, sub := range subs.subscriptions {
-				sub.Unsubscribe()
+			if !atomic.CompareAndSwapInt32(&subs.reconnecting, 0, 1) {
+				return
 			}
-			subs.wg.Wait()
-			eventHandler.OnStatus(&models.ControlResponse{
-				StatusCode: uint32(StatusConnecting),
-				Status:     "reconnecting",
-				Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
-			})
-			_ = jb.Unsubscribe()
-			time.Sleep(1 * time.Second)
-			_, err = jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
-			if err != nil {
-				eventHandler.OnError(err)
-			}
+			// Close waits for the websocket reader. The reader is waiting for
+			// this callback, so reconnect must run after the callback returns.
+			go func() {
+				for _, sub := range subs.subscriptions {
+					sub.Unsubscribe()
+				}
+				subs.wg.Wait()
+				eventHandler.OnStatus(&models.ControlResponse{
+					StatusCode: uint32(StatusConnecting),
+					Status:     "reconnecting",
+					Message:    fmt.Sprintf("Reconnecting to server at block %d, page %d", currentBlock, currentPage),
+				})
+				_ = jb.Unsubscribe()
+				time.Sleep(1 * time.Second)
+				_, reconnectErr := jb.SubscribeWithQueue(ctx, subscriptionID, uint64(currentBlock), currentPage, eventHandler, options)
+				if reconnectErr != nil {
+					eventHandler.OnError(reconnectErr)
+				}
+			}()
 			return
 		}
 

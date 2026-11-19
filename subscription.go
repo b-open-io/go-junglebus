@@ -293,10 +293,18 @@ func (s *Subscription) setupCentrifugeHandlers() {
 		// before the success reply, and centrifuge-go then treats the channel
 		// as permanently unsubscribed: the server keeps publishing to it while
 		// the client silently drops every publication.
+		//
+		// The position is only final once every event received on the old
+		// connection has been processed, so wait for the queue to drain
+		// first; otherwise a block-done still in the queue would be replayed
+		// from the start. Nothing can be added to the queue meanwhile:
+		// centrifuge-go delivers publications through the same callback
+		// queue this handler is running on.
 		s.mu.RLock()
 		isReconnect := s.hasConnected
 		s.mu.RUnlock()
-		if isReconnect && s.EventHandler.OnTransaction != nil {
+		if isReconnect && s.EventHandler.OnTransaction != nil && s.getState() != stateClosed {
+			s.eventQueue.Wait()
 			if err := s.updateMainChannelPosition(); err != nil {
 				log.Printf("Failed to update main channel on reconnect: %v", err)
 				if s.EventHandler.OnError != nil {

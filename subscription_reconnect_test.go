@@ -162,6 +162,11 @@ func (ts *testServer) publishUntilReceived(channel, txID string, received <-chan
 
 func newTestSubscription(t *testing.T, ts *testServer, subID string, fromBlock uint64) (*Subscription, chan *models.TransactionResponse, chan error) {
 	t.Helper()
+	return newTestSubscriptionWithStatus(t, ts, subID, fromBlock, func(*models.ControlResponse) {})
+}
+
+func newTestSubscriptionWithStatus(t *testing.T, ts *testServer, subID string, fromBlock uint64, onStatus func(*models.ControlResponse)) (*Subscription, chan *models.TransactionResponse, chan error) {
+	t.Helper()
 	client, err := New(WithHTTP(ts.host), WithToken("test-token"), WithSSL(false))
 	require.NoError(t, err)
 
@@ -169,7 +174,7 @@ func newTestSubscription(t *testing.T, ts *testServer, subID string, fromBlock u
 	errs := make(chan error, 100)
 	sub, err := client.SubscribeWithQueue(context.Background(), subID, fromBlock, 0, EventHandler{
 		OnTransaction: func(tx *models.TransactionResponse) { received <- tx },
-		OnStatus:      func(*models.ControlResponse) {},
+		OnStatus:      onStatus,
 		OnError:       func(err error) { errs <- err },
 	}, &SubscribeOptions{QueueSize: 100, LiteMode: true})
 	require.NoError(t, err)
@@ -269,4 +274,45 @@ func TestReconnect_RecreatesUnsubscribedMainChannel(t *testing.T) {
 		}
 	default:
 	}
+}
+
+// TestReconnect_UsesPositionAfterQueuedEvents covers events from the old
+// connection that are still queued when the connection drops. The reconnect
+// must resume after them, not from the position at the moment of the drop,
+// which would replay the blocks they completed.
+func TestReconnect_UsesPositionAfterQueuedEvents(t *testing.T) {
+	ts := newTestServer(t, 0)
+	const subID = "queued-test"
+
+	held := make(chan struct{})
+	release := make(chan struct{})
+	var holdOnce sync.Once
+	sub, received, _ := newTestSubscriptionWithStatus(t, ts, subID, 100, func(status *models.ControlResponse) {
+		// Hold the event processor on the first block-done, so the next one
+		// stays queued.
+		if status.StatusCode == uint32(SubscriptionBlockDone) {
+			holdOnce.Do(func() {
+				close(held)
+				<-release
+			})
+		}
+	})
+
+	firstMain := fmt.Sprintf("lite:%s:100:0", subID)
+	require.True(t, ts.publishUntilReceived(firstMain, "tx-before", received, 5*time.Second))
+
+	control := fmt.Sprintf("lite:%s:control", subID)
+	ts.publish(control, &models.ControlResponse{StatusCode: uint32(SubscriptionBlockDone), Status: "block-done", Block: 100})
+	<-held
+	ts.publish(control, &models.ControlResponse{StatusCode: uint32(SubscriptionBlockDone), Status: "block-done", Block: 101})
+	waitFor(t, 5*time.Second, "second block-done to be queued", func() bool { return sub.eventQueue.Len() == 1 })
+
+	ts.forceReconnect()
+	time.Sleep(200 * time.Millisecond) // reconnect starts while the event is still queued
+	close(release)
+
+	resumed := fmt.Sprintf("lite:%s:102:0", subID)
+	waitFor(t, 10*time.Second, "subscribe on "+resumed, func() bool { return ts.subscribeCount(resumed) > 0 })
+	require.Zero(t, ts.subscribeCount(fmt.Sprintf("lite:%s:101:0", subID)), "must not resume from a position before queued block-done events")
+	require.True(t, ts.publishUntilReceived(resumed, "tx-after", received, 5*time.Second))
 }

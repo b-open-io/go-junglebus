@@ -4,15 +4,15 @@ go 1.23
 
 require (
 	github.com/centrifugal/centrifuge v0.33.4
-	github.com/centrifugal/centrifuge-go v0.10.4
+	github.com/centrifugal/centrifuge-go v0.10.12
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/protobuf v1.36.4
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
 	github.com/FZambia/eagle v0.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/centrifugal/protocol v0.14.0 // indirect
+	github.com/centrifugal/protocol v0.16.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
@@ -33,7 +33,7 @@ require (
 	github.com/redis/rueidis v1.0.47 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.4.1 // indirect
-	github.com/shadowspore/fossil-delta v0.0.0-20240102155221-e3a8590b820b // indirect
+	github.com/shadowspore/fossil-delta v0.0.0-20241213113458-1d797d70cbe3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect

@@ -37,8 +37,10 @@ type Subscription struct {
 	mainChannelName  string // Track current main channel name for reconnect updates
 	hasConnected     bool   // Track if we've ever successfully connected
 	// confirmed holds channel subscriptions whose subscribe has completed on
-	// the current connection (see recreateIfNotConfirmed).
-	confirmed map[*centrifuge.Subscription]bool
+	// the current connection; recoverable those the server has reported as
+	// recoverable on any connection (see recreateIfNotConfirmed).
+	confirmed   map[*centrifuge.Subscription]bool
+	recoverable map[*centrifuge.Subscription]bool
 
 	// Event processing
 	eventQueue *eventQueue
@@ -461,8 +463,9 @@ func (s *Subscription) getSubType() string {
 //
 // The control and mempool channels keep their subscription objects, and with
 // them any centrifuge recovery position, if their subscribe had completed on
-// the connection that dropped. Otherwise (still pending, or unsubscribed)
-// they are recreated like the main channel.
+// the connection that dropped or the server uses recovery for them.
+// Otherwise (still pending, or unsubscribed) they are recreated like the main
+// channel.
 func (s *Subscription) recreateChannels() error {
 	subType := s.getSubType()
 	controlChannel := fmt.Sprintf("%s:%s:control", subType, s.SubscriptionID)
@@ -499,21 +502,29 @@ func (s *Subscription) recreateChannels() error {
 	return errors.Join(errs...)
 }
 
-// recreateIfNotConfirmed keeps a recoverable channel's subscription if its
-// subscribe completed on the connection that dropped: no request was pending
-// then, so no stale retry can overlap the automatic resubscribe, and its
-// recovery position is kept. Otherwise it is recreated. Either way it must be
-// confirmed again on the new connection.
+// recreateIfNotConfirmed decides whether a control or mempool subscription
+// survives a reconnect.
+//
+// It is kept if its subscribe completed on the connection that dropped: no
+// request was pending then, so no stale retry can overlap the automatic
+// resubscribe. It is also kept if the server has ever reported it as
+// recoverable, even with a subscribe pending: a new subscription object
+// cannot carry the old one's recovery position, so recreating it would
+// silently skip everything published during the outage. (The rare overlap
+// that remains is reported through OnError and healed on the next
+// reconnect.) Otherwise, which is the case for servers without history such
+// as JungleBus, there is nothing to lose and it is recreated. A subscription
+// that ended up unsubscribed is always recreated.
 func (s *Subscription) recreateIfNotConfirmed(name string, handler func(e centrifuge.PublicationEvent)) error {
 	current := s.channels.Get(name)
 	s.mu.Lock()
-	wasConfirmed := current != nil && s.confirmed[current]
+	keep := current != nil && (s.confirmed[current] || s.recoverable[current])
 	if current != nil {
-		delete(s.confirmed, current)
+		delete(s.confirmed, current) // must be confirmed again on the new connection
 	}
 	s.mu.Unlock()
 
-	if wasConfirmed && current.State() != centrifuge.SubStateUnsubscribed {
+	if keep && current.State() != centrifuge.SubStateUnsubscribed {
 		return nil
 	}
 	return s.recreateChannel(name, name, true, handler)
@@ -522,12 +533,16 @@ func (s *Subscription) recreateIfNotConfirmed(name string, handler func(e centri
 // trackSubscription wires up the handlers every channel subscription needs.
 func (s *Subscription) trackSubscription(sub *centrifuge.Subscription) {
 	sub.OnUnsubscribed(s.channelUnsubscribedHandler(sub))
-	sub.OnSubscribed(func(centrifuge.SubscribedEvent) {
+	sub.OnSubscribed(func(e centrifuge.SubscribedEvent) {
 		s.mu.Lock()
 		if s.confirmed == nil {
 			s.confirmed = make(map[*centrifuge.Subscription]bool)
+			s.recoverable = make(map[*centrifuge.Subscription]bool)
 		}
 		s.confirmed[sub] = true
+		if e.Recoverable {
+			s.recoverable[sub] = true
+		}
 		s.mu.Unlock()
 	})
 }
@@ -540,6 +555,7 @@ func (s *Subscription) recreateChannel(oldName, newName string, recoverable bool
 	if old := s.channels.Get(oldName); old != nil {
 		s.mu.Lock()
 		delete(s.confirmed, old)
+		delete(s.recoverable, old)
 		s.mu.Unlock()
 	}
 	sub, err := s.channels.ReplaceSubscription(oldName, newName, recoverable, handler)

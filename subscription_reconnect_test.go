@@ -68,6 +68,7 @@ func newTestServer(t *testing.T, delay time.Duration) *testServer {
 			ts.mu.Lock()
 			ts.subscribes[e.Channel]++
 			reject := ts.reject
+			delay, delayAll, recovery := ts.delay, ts.delayAll, ts.recovery
 			ts.mu.Unlock()
 
 			if reject != nil {
@@ -76,19 +77,19 @@ func newTestServer(t *testing.T, delay time.Duration) *testServer {
 					return
 				}
 			}
-			if (isMainChannel(e.Channel) || ts.delayAll) && ts.delay > 0 {
+			reply := centrifuge.SubscribeReply{}
+			if recovery && !isMainChannel(e.Channel) {
+				reply.Options.EnableRecovery = true
+			}
+			if (isMainChannel(e.Channel) || delayAll) && delay > 0 {
 				// Reply asynchronously, like a handler that does I/O first.
 				// centrifuge keeps reading commands meanwhile, so a duplicate
 				// subscribe is rejected before this one succeeds.
 				go func() {
-					time.Sleep(ts.delay)
-					cb(centrifuge.SubscribeReply{}, nil)
+					time.Sleep(delay)
+					cb(reply, nil)
 				}()
 				return
-			}
-			reply := centrifuge.SubscribeReply{}
-			if ts.recovery && !isMainChannel(e.Channel) {
-				reply.Options.EnableRecovery = true
 			}
 			cb(reply, nil)
 		})
@@ -458,5 +459,65 @@ func TestReconnect_WhileControlAndMempoolSubscribesPending(t *testing.T) {
 	case <-statuses:
 	case <-time.After(5 * time.Second):
 		t.Fatal("control channel not delivering after reconnecting during a pending subscribe")
+	}
+}
+
+// TestReconnect_RecoveryAcrossInterruptedResubscribe drops the connection twice,
+// the second time while the recovering resubscribe is still pending. A
+// mempool event published during the first outage must still be recovered.
+func TestReconnect_RecoveryAcrossInterruptedResubscribe(t *testing.T) {
+	if raceEnabled {
+		// centrifuge-go v0.10.12 has an internal data race between a scheduled
+		// resubscribe and reconnecting (client.go startReconnecting vs send),
+		// which this test triggers on purpose.
+		t.Skip("triggers a data race inside centrifuge-go")
+	}
+	ts := newTestServer(t, 0)
+	ts.recovery = true
+	const subID = "flap-test"
+	mempoolChannel := fmt.Sprintf("lite:%s:mempool", subID)
+
+	client, err := New(WithHTTP(ts.host), WithToken("test-token"), WithSSL(false))
+	require.NoError(t, err)
+	mempool := make(chan *models.TransactionResponse, 100)
+	sub, err := client.SubscribeWithQueue(context.Background(), subID, 100, 0, EventHandler{
+		OnTransaction: func(*models.TransactionResponse) {},
+		OnMempool:     func(tx *models.TransactionResponse) { mempool <- tx },
+		OnStatus:      func(*models.ControlResponse) {},
+		OnError:       func(error) {},
+	}, &SubscribeOptions{QueueSize: 100, LiteMode: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sub.Unsubscribe() })
+	require.True(t, ts.publishUntilReceivedOn(mempoolChannel, "mempool-before", mempool, 5*time.Second))
+
+	disconnected := func() bool {
+		state := sub.State()
+		return state == "connecting" || state == "disconnected"
+	}
+
+	// First outage: publish while disconnected.
+	ts.forceReconnect()
+	waitFor(t, 5*time.Second, "first disconnect", disconnected)
+	ts.publish(mempoolChannel, &models.TransactionResponse{Id: "mempool-while-offline"})
+
+	// Second outage while the recovering resubscribe is pending.
+	ts.mu.Lock()
+	ts.delayAll, ts.delay = true, 500*time.Millisecond
+	ts.mu.Unlock()
+	before := ts.subscribeCount(mempoolChannel)
+	waitFor(t, 10*time.Second, "recovering resubscribe to start", func() bool { return ts.subscribeCount(mempoolChannel) > before })
+	ts.forceReconnect()
+
+	deadline := time.After(15 * time.Second)
+	for {
+		select {
+		case tx := <-mempool:
+			if tx.Id == "mempool-while-offline" {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("event published during the first outage was not recovered after the interrupted resubscribe (mempool subscribes=%d duplicates=%d state=%s)",
+				ts.subscribeCount(mempoolChannel), ts.duplicateCount(mempoolChannel), sub.channels.Get(mempoolChannel).State())
+		}
 	}
 }

@@ -149,9 +149,16 @@ func (m *channelManager) ReplaceSubscription(oldName, newName string, handler fu
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Unsubscribe from old channel if it exists
+	// Unsubscribe from the old channel and drop it from the centrifuge client's
+	// registry as well. Leaving it registered leaks a Subscription per
+	// reconnect and makes NewSubscription fail with ErrDuplicateSubscription
+	// whenever the same channel name comes back (e.g. recreating an
+	// unsubscribed main channel at an unchanged position).
 	if oldSub, exists := m.channels[oldName]; exists {
-		oldSub.Unsubscribe()
+		_ = oldSub.Unsubscribe()
+		if err := m.client.RemoveSubscription(oldSub); err != nil {
+			return nil, fmt.Errorf("remove subscription %s: %w", oldName, err)
+		}
 		delete(m.channels, oldName)
 	}
 

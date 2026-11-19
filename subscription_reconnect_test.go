@@ -20,12 +20,13 @@ import (
 // testServer is an in-process centrifuge server that behaves like the
 // JungleBus server for the parts that matter to reconnect handling.
 type testServer struct {
-	t      *testing.T
-	node   *centrifuge.Node
-	http   *httptest.Server
-	host   string
-	delay  time.Duration // how long the main channel OnSubscribe takes (JungleBus does a DB lookup)
-	reject func(channel string) error
+	t        *testing.T
+	node     *centrifuge.Node
+	http     *httptest.Server
+	host     string
+	delay    time.Duration // how long the main channel OnSubscribe takes (JungleBus does a DB lookup)
+	reject   func(channel string) error
+	recovery bool // keep history and enable recovery on control and mempool channels
 
 	mu         sync.Mutex
 	subscribes map[string]int // subscribe commands that reached OnSubscribe, per channel
@@ -84,7 +85,11 @@ func newTestServer(t *testing.T, delay time.Duration) *testServer {
 				}()
 				return
 			}
-			cb(centrifuge.SubscribeReply{}, nil)
+			reply := centrifuge.SubscribeReply{}
+			if ts.recovery && !isMainChannel(e.Channel) {
+				reply.Options.EnableRecovery = true
+			}
+			cb(reply, nil)
 		})
 	})
 	require.NoError(t, node.Run())
@@ -135,8 +140,32 @@ func (ts *testServer) forceReconnect() {
 func (ts *testServer) publish(channel string, msg proto.Message) {
 	data, err := proto.Marshal(msg)
 	require.NoError(ts.t, err)
-	_, err = ts.node.Publish(channel, data)
+	var opts []centrifuge.PublishOption
+	if ts.recovery && !isMainChannel(channel) {
+		opts = append(opts, centrifuge.WithHistory(100, time.Minute))
+	}
+	_, err = ts.node.Publish(channel, data, opts...)
 	require.NoError(ts.t, err)
+}
+
+// publishUntilReceivedOn publishes a transaction on a non-block channel until
+// it is delivered.
+func (ts *testServer) publishUntilReceivedOn(channel, txID string, received <-chan *models.TransactionResponse, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		ts.publish(channel, &models.TransactionResponse{Id: txID})
+		select {
+		case tx := <-received:
+			if tx.Id == txID {
+				return true
+			}
+		case <-tick.C:
+		case <-deadline:
+			return false
+		}
+	}
 }
 
 // publishUntilReceived publishes a transaction on channel until the client
@@ -335,4 +364,50 @@ func TestReconnect_WhileMainSubscribePending(t *testing.T) {
 	require.Zero(t, ts.duplicateCount(mainChannel), "main channel must not be subscribed twice on the same connection")
 	require.True(t, ts.publishUntilReceived(mainChannel, "tx-after", received, 5*time.Second),
 		"transaction not delivered after reconnecting during a pending subscribe")
+}
+
+// TestReconnect_RecoversMempoolPublishedWhileDisconnected checks that
+// recreating channels on reconnect keeps centrifuge recovery working for the
+// recoverable channels: a mempool event published while the client is
+// disconnected must arrive after the reconnect without being republished.
+func TestReconnect_RecoversMempoolPublishedWhileDisconnected(t *testing.T) {
+	ts := newTestServer(t, 0)
+	ts.recovery = true
+	const subID = "recovery-test"
+	mempoolChannel := fmt.Sprintf("lite:%s:mempool", subID)
+
+	client, err := New(WithHTTP(ts.host), WithToken("test-token"), WithSSL(false))
+	require.NoError(t, err)
+	mempool := make(chan *models.TransactionResponse, 100)
+	sub, err := client.SubscribeWithQueue(context.Background(), subID, 100, 0, EventHandler{
+		OnTransaction: func(*models.TransactionResponse) {},
+		OnMempool:     func(tx *models.TransactionResponse) { mempool <- tx },
+		OnStatus:      func(*models.ControlResponse) {},
+		OnError:       func(error) {},
+	}, &SubscribeOptions{QueueSize: 100, LiteMode: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sub.Unsubscribe() })
+
+	require.True(t, ts.publishUntilReceivedOn(mempoolChannel, "mempool-before", mempool, 5*time.Second))
+	controlBefore := sub.channels.Get(fmt.Sprintf("lite:%s:control", subID))
+	require.NotNil(t, controlBefore)
+
+	ts.forceReconnect()
+	waitFor(t, 5*time.Second, "client to notice the disconnect", func() bool {
+		state := sub.State()
+		return state == "connecting" || state == "disconnected"
+	})
+	ts.publish(mempoolChannel, &models.TransactionResponse{Id: "mempool-while-offline"})
+
+	select {
+	case tx := <-mempool:
+		for tx.Id == "mempool-before" { // drain repeats from the first loop
+			tx = <-mempool
+		}
+		require.Equal(t, "mempool-while-offline", tx.Id)
+	case <-time.After(10 * time.Second):
+		t.Fatal("mempool event published while disconnected was not recovered")
+	}
+	require.Same(t, controlBefore, sub.channels.Get(fmt.Sprintf("lite:%s:control", subID)),
+		"a healthy recoverable channel must keep its subscription (and recovery position) across reconnects")
 }

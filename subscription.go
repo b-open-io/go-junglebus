@@ -441,25 +441,32 @@ func (s *Subscription) getSubType() string {
 	return "query"
 }
 
-// recreateChannels replaces every channel subscription with a new one, the main
-// channel at the current position. It is called while reconnecting, before
-// the connection is re-established, so centrifuge-go sends exactly one
-// subscribe per channel once it is connected again.
+// recreateChannels prepares the channel subscriptions for the new connection.
+// It is called while reconnecting, before the connection is re-established,
+// so centrifuge-go sends exactly one subscribe per channel once it is
+// connected again.
 //
-// The subscriptions are recreated even when their names have not changed.
-// Keeping the old objects carries their state into the new connection: one
-// that ended up unsubscribed (after a non-temporary subscribe error) would
-// never be subscribed again, leaving e.g. only the control channel and no
-// publisher on the server, and one whose subscribe was still pending when the
-// connection dropped can have a retry scheduled that overlaps the automatic
-// resubscribe, so the channel is subscribed twice and rejected with 105.
+// The main channel is always recreated, at the current position, even when
+// its name has not changed. Keeping the old object carries its state into the
+// new connection: one that ended up unsubscribed (after a non-temporary
+// subscribe error) would never be subscribed again, leaving no publisher on
+// the server, and one whose subscribe was still pending when the connection
+// dropped can have a retry scheduled that overlaps the automatic resubscribe,
+// so the channel is subscribed twice and rejected with 105. The main channel
+// does not use centrifuge recovery (the position is tracked here), so nothing
+// is lost by recreating it.
+//
+// The control and mempool channels keep their subscription objects, and with
+// them any centrifuge recovery position, unless they have ended up
+// unsubscribed, in which case they are recreated so they recover on this
+// reconnect.
 func (s *Subscription) recreateChannels() error {
 	subType := s.getSubType()
 	controlChannel := fmt.Sprintf("%s:%s:control", subType, s.SubscriptionID)
 	mempoolChannel := fmt.Sprintf("%s:%s:mempool", subType, s.SubscriptionID)
 
 	var errs []error
-	if err := s.recreateChannel(controlChannel, controlChannel, s.controlPublicationHandler); err != nil {
+	if err := s.recreateIfUnsubscribed(controlChannel, s.controlPublicationHandler); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -472,7 +479,7 @@ func (s *Subscription) recreateChannels() error {
 		if newMain != currentMain {
 			log.Printf("Updating main channel from %s to %s", currentMain, newMain)
 		}
-		if err := s.recreateChannel(currentMain, newMain, s.mainChannelPublicationHandler); err != nil {
+		if err := s.recreateChannel(currentMain, newMain, false, s.mainChannelPublicationHandler); err != nil {
 			errs = append(errs, err)
 		} else {
 			s.mu.Lock()
@@ -482,19 +489,28 @@ func (s *Subscription) recreateChannels() error {
 	}
 
 	if s.EventHandler.OnMempool != nil {
-		if err := s.recreateChannel(mempoolChannel, mempoolChannel, s.mempoolPublicationHandler); err != nil {
+		if err := s.recreateIfUnsubscribed(mempoolChannel, s.mempoolPublicationHandler); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
+// recreateIfUnsubscribed recreates a recoverable channel only if its
+// subscription has ended up unsubscribed (or is missing).
+func (s *Subscription) recreateIfUnsubscribed(name string, handler func(e centrifuge.PublicationEvent)) error {
+	if current := s.channels.Get(name); current != nil && current.State() != centrifuge.SubStateUnsubscribed {
+		return nil
+	}
+	return s.recreateChannel(name, name, true, handler)
+}
+
 // recreateChannel replaces the subscription oldName with a new one named
 // newName and starts subscribing it. While disconnected, Subscribe only marks
 // the channel as subscribing; the subscribe command is sent once, after the
 // connection is established.
-func (s *Subscription) recreateChannel(oldName, newName string, handler func(e centrifuge.PublicationEvent)) error {
-	sub, err := s.channels.ReplaceSubscription(oldName, newName, handler)
+func (s *Subscription) recreateChannel(oldName, newName string, recoverable bool, handler func(e centrifuge.PublicationEvent)) error {
+	sub, err := s.channels.ReplaceSubscription(oldName, newName, recoverable, handler)
 	if err != nil {
 		return err
 	}

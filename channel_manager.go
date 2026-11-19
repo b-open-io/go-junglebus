@@ -145,7 +145,7 @@ func (m *channelManager) Names() []string {
 
 // ReplaceSubscription unsubscribes from oldName and creates a new subscription with newName.
 // This is used to update the main channel position on reconnect.
-func (m *channelManager) ReplaceSubscription(oldName, newName string, handler func(e centrifuge.PublicationEvent)) (*centrifuge.Subscription, error) {
+func (m *channelManager) ReplaceSubscription(oldName, newName string, recoverable bool, handler func(e centrifuge.PublicationEvent)) (*centrifuge.Subscription, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -164,7 +164,7 @@ func (m *channelManager) ReplaceSubscription(oldName, newName string, handler fu
 
 	// Create new subscription
 	sub, err := m.client.NewSubscription(newName, centrifuge.SubscriptionConfig{
-		Recoverable: false, // Don't recover on reconnect - we handle position ourselves
+		Recoverable: recoverable,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create subscription %s: %w", newName, err)

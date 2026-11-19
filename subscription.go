@@ -300,6 +300,14 @@ func (s *Subscription) setupCentrifugeHandlers() {
 		// from the start. Nothing can be added to the queue meanwhile:
 		// centrifuge-go delivers publications through the same callback
 		// queue this handler is running on.
+		//
+		// Delivery stays at-least-once: a publication already read off the
+		// old connection can still be queued behind this handler, and
+		// centrifuge-go has no hook for the old reader finishing. Its
+		// block-done then advances the position after the channel was chosen
+		// and that block is delivered again. Skipping such "completed" blocks
+		// is not safe, because control and main messages can arrive out of
+		// order relative to each other.
 		s.mu.RLock()
 		isReconnect := s.hasConnected
 		s.mu.RUnlock()

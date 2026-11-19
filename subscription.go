@@ -255,6 +255,10 @@ func (s *Subscription) handleMempoolEvent(data []byte) {
 	}
 }
 
+// reconnectDrainTimeout bounds how long a reconnect waits for events from the
+// old connection to be processed before choosing the main channel position.
+var reconnectDrainTimeout = 10 * time.Second
+
 // setupCentrifugeHandlers configures all event handlers for the centrifuge client
 func (s *Subscription) setupCentrifugeHandlers() {
 	c := s.centrifugeClient
@@ -279,26 +283,67 @@ func (s *Subscription) setupCentrifugeHandlers() {
 				Message:    message,
 			})
 		}
-	})
 
-	c.OnConnected(func(e centrifuge.ConnectedEvent) {
-		s.setState(stateConnected)
-
-		// Check if this is a reconnect (we've connected before)
-		s.mu.Lock()
+		// On reconnect, move the main channel to the current position here,
+		// while the client is not connected. Subscribe() on a disconnected
+		// centrifuge client only marks the subscription as subscribing, and
+		// centrifuge-go sends exactly one subscribe command for it once the
+		// connection is re-established.
+		//
+		// This used to happen in OnConnected, but centrifuge-go runs that
+		// handler before its own resubscribe pass, so the new channel was
+		// subscribed twice on the same connection. The server rejects the
+		// second command with 105 "already subscribed", that error can arrive
+		// before the success reply, and centrifuge-go then treats the channel
+		// as permanently unsubscribed: the server keeps publishing to it while
+		// the client silently drops every publication.
+		//
+		// The position is only final once every event received on the old
+		// connection has been processed, so wait for the queue to drain
+		// first; otherwise a block-done still in the queue would be replayed
+		// from the start. Nothing can be added to the queue meanwhile:
+		// centrifuge-go delivers publications through the same callback
+		// queue this handler is running on.
+		//
+		// Delivery stays at-least-once: a publication already read off the
+		// old connection can still be queued behind this handler, and
+		// centrifuge-go has no hook for the old reader finishing. Its
+		// block-done then advances the position after the channel was chosen
+		// and that block is delivered again. Skipping such "completed" blocks
+		// is not safe, because control and main messages can arrive out of
+		// order relative to each other.
+		s.mu.RLock()
 		isReconnect := s.hasConnected
-		s.hasConnected = true
-		s.mu.Unlock()
-
-		// On reconnect, update the main channel to use current position
-		if isReconnect && s.EventHandler.OnTransaction != nil && s.mainChannelName != "" {
-			if err := s.updateMainChannelPosition(); err != nil {
-				log.Printf("Failed to update main channel on reconnect: %v", err)
+		s.mu.RUnlock()
+		if isReconnect && s.getState() != stateClosed {
+			// Bounded: the reconnect is only scheduled once this handler
+			// returns, so a stalled event handler must not keep every
+			// channel offline. If the queue is not drained in time, the
+			// position lags and the main channel replays from an earlier
+			// point (more duplicates, never loss).
+			s.mu.RLock()
+			hasMain := s.mainChannelName != ""
+			s.mu.RUnlock()
+			if hasMain && !s.eventQueue.WaitIdle(reconnectDrainTimeout) {
+				log.Printf("Event queue not drained within %s; reconnecting from the last processed position", reconnectDrainTimeout)
+			}
+			if err := s.recreateChannels(); err != nil {
+				log.Printf("Failed to recreate channels on reconnect: %v", err)
 				if s.EventHandler.OnError != nil {
 					s.EventHandler.OnError(fmt.Errorf("reconnect channel update: %w", err))
 				}
 			}
 		}
+	})
+
+	c.OnConnected(func(e centrifuge.ConnectedEvent) {
+		s.setState(stateConnected)
+
+		// Remember that we have connected once, so the next OnConnecting is
+		// treated as a reconnect (see the main channel update there).
+		s.mu.Lock()
+		s.hasConnected = true
+		s.mu.Unlock()
 
 		if s.EventHandler.OnStatus != nil {
 			s.EventHandler.OnStatus(&models.ControlResponse{
@@ -410,43 +455,123 @@ func (s *Subscription) getSubType() string {
 	return "query"
 }
 
-// updateMainChannelPosition replaces the main channel subscription with a new one
-// using the current position. Called on reconnect to avoid replaying old data.
-func (s *Subscription) updateMainChannelPosition() error {
-	if s.mainChannelName == "" {
-		return nil // No main channel to update
+// recreateChannels prepares the channel subscriptions for the new connection.
+// It is called while reconnecting, before the connection is re-established,
+// so centrifuge-go sends exactly one subscribe per channel once it is
+// connected again.
+//
+// The main channel is always recreated, at the current position, even when
+// its name has not changed. Keeping the old object carries its state into the
+// new connection: one that ended up unsubscribed (after a non-temporary
+// subscribe error) would never be subscribed again, leaving no publisher on
+// the server, and one whose subscribe was still pending when the connection
+// dropped can have a retry scheduled that overlaps the automatic resubscribe,
+// so the channel is subscribed twice and rejected with 105. The main channel
+// does not use centrifuge recovery (the position is tracked here), so nothing
+// is lost by recreating it.
+//
+// The control and mempool channels keep their subscription objects, and with
+// them any centrifuge recovery position (a new object cannot carry it), unless
+// they have ended up unsubscribed. Keeping a subscription whose subscribe was
+// still pending at the drop relies on centrifuge-go >= v0.10.12, where a stale
+// retry no longer overlaps the automatic resubscribe.
+func (s *Subscription) recreateChannels() error {
+	subType := s.getSubType()
+	controlChannel := fmt.Sprintf("%s:%s:control", subType, s.SubscriptionID)
+	mempoolChannel := fmt.Sprintf("%s:%s:mempool", subType, s.SubscriptionID)
+
+	var errs []error
+	if err := s.recreateIfUnsubscribed(controlChannel, s.controlPublicationHandler); err != nil {
+		errs = append(errs, err)
 	}
 
-	subType := s.getSubType()
-	block, page := s.position.Get()
-	newChannelName := fmt.Sprintf("%s:%s:%d:%d", subType, s.SubscriptionID, block, page)
+	s.mu.RLock()
+	currentMain := s.mainChannelName
+	s.mu.RUnlock()
+	if currentMain != "" {
+		block, page := s.position.Get()
+		newMain := fmt.Sprintf("%s:%s:%d:%d", subType, s.SubscriptionID, block, page)
+		if newMain != currentMain {
+			log.Printf("Updating main channel from %s to %s", currentMain, newMain)
+		}
+		if err := s.recreateChannel(currentMain, newMain, false, s.mainChannelPublicationHandler); err != nil {
+			errs = append(errs, err)
+		} else {
+			s.mu.Lock()
+			s.mainChannelName = newMain
+			s.mu.Unlock()
+		}
+	}
 
-	// If position hasn't changed, no need to update
-	if newChannelName == s.mainChannelName {
+	if s.EventHandler.OnMempool != nil {
+		if err := s.recreateIfUnsubscribed(mempoolChannel, s.mempoolPublicationHandler); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// recreateIfUnsubscribed recreates a control or mempool subscription only if
+// it has ended up unsubscribed (or is missing).
+func (s *Subscription) recreateIfUnsubscribed(name string, handler func(e centrifuge.PublicationEvent)) error {
+	if current := s.channels.Get(name); current != nil && current.State() != centrifuge.SubStateUnsubscribed {
 		return nil
 	}
+	return s.recreateChannel(name, name, true, handler)
+}
 
-	log.Printf("Updating main channel from %s to %s", s.mainChannelName, newChannelName)
+// trackSubscription wires up the handlers every channel subscription needs.
+func (s *Subscription) trackSubscription(sub *centrifuge.Subscription) {
+	sub.OnUnsubscribed(s.channelUnsubscribedHandler(sub))
+}
 
-	// Replace the subscription with new position
-	sub, err := s.channels.ReplaceSubscription(s.mainChannelName, newChannelName, func(e centrifuge.PublicationEvent) {
-		s.addToQueue(&pubEvent{Channel: "main", Data: e.Data})
-	})
+// recreateChannel replaces the subscription oldName with a new one named
+// newName and starts subscribing it. While disconnected, Subscribe only marks
+// the channel as subscribing; the subscribe command is sent once, after the
+// connection is established.
+func (s *Subscription) recreateChannel(oldName, newName string, recoverable bool, handler func(e centrifuge.PublicationEvent)) error {
+	sub, err := s.channels.ReplaceSubscription(oldName, newName, recoverable, handler)
 	if err != nil {
 		return err
 	}
-
-	// Subscribe to the new channel
+	s.trackSubscription(sub)
 	if err := sub.Subscribe(); err != nil {
-		return fmt.Errorf("subscribe to new channel: %w", err)
+		return fmt.Errorf("subscribe to %s: %w", newName, err)
 	}
-
-	// Update tracked name
-	s.mu.Lock()
-	s.mainChannelName = newChannelName
-	s.mu.Unlock()
-
 	return nil
+}
+
+// controlPublicationHandler queues publications from the control channel
+func (s *Subscription) controlPublicationHandler(e centrifuge.PublicationEvent) {
+	s.addToQueue(&pubEvent{Channel: "control", Data: e.Data})
+}
+
+// mainChannelPublicationHandler queues publications from the main channel
+func (s *Subscription) mainChannelPublicationHandler(e centrifuge.PublicationEvent) {
+	s.addToQueue(&pubEvent{Channel: "main", Data: e.Data})
+}
+
+// mempoolPublicationHandler queues publications from the mempool channel
+func (s *Subscription) mempoolPublicationHandler(e centrifuge.PublicationEvent) {
+	s.addToQueue(&pubEvent{Channel: "mempool", Data: e.Data})
+}
+
+// channelUnsubscribedHandler reports a channel that stopped receiving for any
+// reason other than our own unsubscribe. centrifuge-go does not retry
+// non-temporary subscribe errors, so without this the subscription would go
+// silent with no error at all. The channel is recreated on the next reconnect.
+func (s *Subscription) channelUnsubscribedHandler(sub *centrifuge.Subscription) centrifuge.UnsubscribedHandler {
+	return func(e centrifuge.UnsubscribedEvent) {
+		// 0 = Unsubscribe() called by us, 2 = client closed
+		if e.Code == 0 || e.Code == 2 || s.getState() == stateClosed {
+			return
+		}
+		err := fmt.Errorf("channel %s unsubscribed (code %d: %s); it will be resubscribed on the next reconnect", sub.Channel, e.Code, e.Reason)
+		log.Print(err)
+		if s.EventHandler.OnError != nil {
+			s.EventHandler.OnError(err)
+		}
+	}
 }
 
 // setupChannels creates and configures all subscription channels
@@ -454,20 +579,25 @@ func (s *Subscription) setupChannels() error {
 	subType := s.getSubType()
 	block, page := s.position.Get()
 
+	create := func(name string, handler func(e centrifuge.PublicationEvent)) error {
+		sub, err := s.channels.CreateSubscription(name, handler)
+		if err != nil {
+			return err
+		}
+		s.trackSubscription(sub)
+		return nil
+	}
+
 	// Control channel
 	controlChannel := fmt.Sprintf("%s:%s:control", subType, s.SubscriptionID)
-	if _, err := s.channels.CreateSubscription(controlChannel, func(e centrifuge.PublicationEvent) {
-		s.addToQueue(&pubEvent{Channel: "control", Data: e.Data})
-	}); err != nil {
+	if err := create(controlChannel, s.controlPublicationHandler); err != nil {
 		return fmt.Errorf("create control channel: %w", err)
 	}
 
 	// Main transaction channel (if handler provided)
 	if s.EventHandler.OnTransaction != nil {
 		mainChannel := fmt.Sprintf("%s:%s:%d:%d", subType, s.SubscriptionID, block, page)
-		if _, err := s.channels.CreateSubscription(mainChannel, func(e centrifuge.PublicationEvent) {
-			s.addToQueue(&pubEvent{Channel: "main", Data: e.Data})
-		}); err != nil {
+		if err := create(mainChannel, s.mainChannelPublicationHandler); err != nil {
 			return fmt.Errorf("create main channel: %w", err)
 		}
 		// Track main channel name for reconnect updates
@@ -477,9 +607,7 @@ func (s *Subscription) setupChannels() error {
 	// Mempool channel (if handler provided)
 	if s.EventHandler.OnMempool != nil {
 		mempoolChannel := fmt.Sprintf("%s:%s:mempool", subType, s.SubscriptionID)
-		if _, err := s.channels.CreateSubscription(mempoolChannel, func(e centrifuge.PublicationEvent) {
-			s.addToQueue(&pubEvent{Channel: "mempool", Data: e.Data})
-		}); err != nil {
+		if err := create(mempoolChannel, s.mempoolPublicationHandler); err != nil {
 			return fmt.Errorf("create mempool channel: %w", err)
 		}
 	}

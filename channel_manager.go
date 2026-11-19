@@ -145,19 +145,26 @@ func (m *channelManager) Names() []string {
 
 // ReplaceSubscription unsubscribes from oldName and creates a new subscription with newName.
 // This is used to update the main channel position on reconnect.
-func (m *channelManager) ReplaceSubscription(oldName, newName string, handler func(e centrifuge.PublicationEvent)) (*centrifuge.Subscription, error) {
+func (m *channelManager) ReplaceSubscription(oldName, newName string, recoverable bool, handler func(e centrifuge.PublicationEvent)) (*centrifuge.Subscription, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Unsubscribe from old channel if it exists
+	// Unsubscribe from the old channel and drop it from the centrifuge client's
+	// registry as well. Leaving it registered leaks a Subscription per
+	// reconnect and makes NewSubscription fail with ErrDuplicateSubscription
+	// whenever the same channel name comes back (e.g. recreating an
+	// unsubscribed main channel at an unchanged position).
 	if oldSub, exists := m.channels[oldName]; exists {
-		oldSub.Unsubscribe()
+		_ = oldSub.Unsubscribe()
+		if err := m.client.RemoveSubscription(oldSub); err != nil {
+			return nil, fmt.Errorf("remove subscription %s: %w", oldName, err)
+		}
 		delete(m.channels, oldName)
 	}
 
 	// Create new subscription
 	sub, err := m.client.NewSubscription(newName, centrifuge.SubscriptionConfig{
-		Recoverable: false, // Don't recover on reconnect - we handle position ourselves
+		Recoverable: recoverable,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create subscription %s: %w", newName, err)

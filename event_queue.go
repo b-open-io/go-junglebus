@@ -3,14 +3,16 @@ package junglebus
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // eventQueue provides a thread-safe buffered channel for subscription events.
 // It handles the race condition between sending events and closing the queue.
 type eventQueue struct {
-	ch     chan *pubEvent
-	closed atomic.Bool
-	wg     sync.WaitGroup
+	ch          chan *pubEvent
+	closed      atomic.Bool
+	wg          sync.WaitGroup
+	outstanding atomic.Int64 // sent and not yet Done
 }
 
 // newEventQueue creates a new event queue with the specified buffer size
@@ -36,11 +38,13 @@ func (q *eventQueue) Send(event *pubEvent) bool {
 	// Use select with default for non-blocking send
 	// This prevents blocking when the queue is full
 	q.wg.Add(1)
+	q.outstanding.Add(1)
 	select {
 	case q.ch <- event:
 		return true
 	default:
 		// Queue is full - undo the wg.Add
+		q.outstanding.Add(-1)
 		q.wg.Done()
 		return false
 	}
@@ -54,6 +58,7 @@ func (q *eventQueue) SendBlocking(event *pubEvent) bool {
 	}
 
 	q.wg.Add(1)
+	q.outstanding.Add(1)
 
 	// We need to handle the case where the queue closes while we're waiting
 	select {
@@ -62,6 +67,7 @@ func (q *eventQueue) SendBlocking(event *pubEvent) bool {
 	default:
 		// Channel might be closed or full, try again with closed check
 		if q.closed.Load() {
+			q.outstanding.Add(-1)
 			q.wg.Done()
 			return false
 		}
@@ -84,7 +90,22 @@ func (q *eventQueue) Close() {
 // Done marks an event as processed.
 // Must be called once for each successfully sent event after processing.
 func (q *eventQueue) Done() {
+	q.outstanding.Add(-1)
 	q.wg.Done()
+}
+
+// WaitIdle waits until every sent event has been processed, or until timeout.
+// It reports whether the queue became idle. Unlike Wait it can be called
+// while events are still being sent.
+func (q *eventQueue) WaitIdle(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for q.outstanding.Load() > 0 {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return true
 }
 
 // Wait blocks until all sent events have been processed (Done called).

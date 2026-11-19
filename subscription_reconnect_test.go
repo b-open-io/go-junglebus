@@ -526,3 +526,42 @@ func TestReconnect_RecoveryAcrossInterruptedResubscribe(t *testing.T) {
 		}
 	}
 }
+
+// TestReconnect_NotBlockedByStalledEventHandler: a stalled event handler must
+// not keep the subscription offline; the reconnect proceeds after the drain
+// timeout (from the last processed position).
+func TestReconnect_NotBlockedByStalledEventHandler(t *testing.T) {
+	old := reconnectDrainTimeout
+	reconnectDrainTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { reconnectDrainTimeout = old })
+
+	ts := newTestServer(t, 0)
+	const subID = "stalled-test"
+	mainChannel := fmt.Sprintf("lite:%s:100:0", subID)
+
+	release := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	var stallOnce sync.Once
+	_, received, _ := newTestSubscriptionWithStatus(t, ts, subID, 100, func(status *models.ControlResponse) {
+		if status.StatusCode == uint32(SubscriptionBlockDone) {
+			stallOnce.Do(func() { <-release })
+		}
+	})
+	require.True(t, ts.publishUntilReceived(mainChannel, "tx-before", received, 5*time.Second))
+
+	ts.publish(fmt.Sprintf("lite:%s:control", subID), &models.ControlResponse{StatusCode: uint32(SubscriptionBlockDone), Status: "block-done", Block: 100})
+	time.Sleep(100 * time.Millisecond) // handler is now stalled
+	before := ts.subscribeCount(fmt.Sprintf("lite:%s:control", subID))
+	ts.forceReconnect()
+
+	waitFor(t, 5*time.Second, "reconnect despite the stalled handler", func() bool {
+		return ts.subscribeCount(fmt.Sprintf("lite:%s:control", subID)) > before
+	})
+	close(release)
+}

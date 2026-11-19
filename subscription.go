@@ -255,6 +255,10 @@ func (s *Subscription) handleMempoolEvent(data []byte) {
 	}
 }
 
+// reconnectDrainTimeout bounds how long a reconnect waits for events from the
+// old connection to be processed before choosing the main channel position.
+var reconnectDrainTimeout = 10 * time.Second
+
 // setupCentrifugeHandlers configures all event handlers for the centrifuge client
 func (s *Subscription) setupCentrifugeHandlers() {
 	c := s.centrifugeClient
@@ -312,7 +316,17 @@ func (s *Subscription) setupCentrifugeHandlers() {
 		isReconnect := s.hasConnected
 		s.mu.RUnlock()
 		if isReconnect && s.getState() != stateClosed {
-			s.eventQueue.Wait()
+			// Bounded: the reconnect is only scheduled once this handler
+			// returns, so a stalled event handler must not keep every
+			// channel offline. If the queue is not drained in time, the
+			// position lags and the main channel replays from an earlier
+			// point (more duplicates, never loss).
+			s.mu.RLock()
+			hasMain := s.mainChannelName != ""
+			s.mu.RUnlock()
+			if hasMain && !s.eventQueue.WaitIdle(reconnectDrainTimeout) {
+				log.Printf("Event queue not drained within %s; reconnecting from the last processed position", reconnectDrainTimeout)
+			}
 			if err := s.recreateChannels(); err != nil {
 				log.Printf("Failed to recreate channels on reconnect: %v", err)
 				if s.EventHandler.OnError != nil {

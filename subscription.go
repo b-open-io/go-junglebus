@@ -36,6 +36,9 @@ type Subscription struct {
 	channels         *channelManager
 	mainChannelName  string // Track current main channel name for reconnect updates
 	hasConnected     bool   // Track if we've ever successfully connected
+	// confirmed holds channel subscriptions whose subscribe has completed on
+	// the current connection (see recreateIfNotConfirmed).
+	confirmed map[*centrifuge.Subscription]bool
 
 	// Event processing
 	eventQueue *eventQueue
@@ -457,16 +460,16 @@ func (s *Subscription) getSubType() string {
 // is lost by recreating it.
 //
 // The control and mempool channels keep their subscription objects, and with
-// them any centrifuge recovery position, unless they have ended up
-// unsubscribed, in which case they are recreated so they recover on this
-// reconnect.
+// them any centrifuge recovery position, if their subscribe had completed on
+// the connection that dropped. Otherwise (still pending, or unsubscribed)
+// they are recreated like the main channel.
 func (s *Subscription) recreateChannels() error {
 	subType := s.getSubType()
 	controlChannel := fmt.Sprintf("%s:%s:control", subType, s.SubscriptionID)
 	mempoolChannel := fmt.Sprintf("%s:%s:mempool", subType, s.SubscriptionID)
 
 	var errs []error
-	if err := s.recreateIfUnsubscribed(controlChannel, s.controlPublicationHandler); err != nil {
+	if err := s.recreateIfNotConfirmed(controlChannel, s.controlPublicationHandler); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -489,20 +492,44 @@ func (s *Subscription) recreateChannels() error {
 	}
 
 	if s.EventHandler.OnMempool != nil {
-		if err := s.recreateIfUnsubscribed(mempoolChannel, s.mempoolPublicationHandler); err != nil {
+		if err := s.recreateIfNotConfirmed(mempoolChannel, s.mempoolPublicationHandler); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// recreateIfUnsubscribed recreates a recoverable channel only if its
-// subscription has ended up unsubscribed (or is missing).
-func (s *Subscription) recreateIfUnsubscribed(name string, handler func(e centrifuge.PublicationEvent)) error {
-	if current := s.channels.Get(name); current != nil && current.State() != centrifuge.SubStateUnsubscribed {
+// recreateIfNotConfirmed keeps a recoverable channel's subscription if its
+// subscribe completed on the connection that dropped: no request was pending
+// then, so no stale retry can overlap the automatic resubscribe, and its
+// recovery position is kept. Otherwise it is recreated. Either way it must be
+// confirmed again on the new connection.
+func (s *Subscription) recreateIfNotConfirmed(name string, handler func(e centrifuge.PublicationEvent)) error {
+	current := s.channels.Get(name)
+	s.mu.Lock()
+	wasConfirmed := current != nil && s.confirmed[current]
+	if current != nil {
+		delete(s.confirmed, current)
+	}
+	s.mu.Unlock()
+
+	if wasConfirmed && current.State() != centrifuge.SubStateUnsubscribed {
 		return nil
 	}
 	return s.recreateChannel(name, name, true, handler)
+}
+
+// trackSubscription wires up the handlers every channel subscription needs.
+func (s *Subscription) trackSubscription(sub *centrifuge.Subscription) {
+	sub.OnUnsubscribed(s.channelUnsubscribedHandler(sub))
+	sub.OnSubscribed(func(centrifuge.SubscribedEvent) {
+		s.mu.Lock()
+		if s.confirmed == nil {
+			s.confirmed = make(map[*centrifuge.Subscription]bool)
+		}
+		s.confirmed[sub] = true
+		s.mu.Unlock()
+	})
 }
 
 // recreateChannel replaces the subscription oldName with a new one named
@@ -510,11 +537,16 @@ func (s *Subscription) recreateIfUnsubscribed(name string, handler func(e centri
 // the channel as subscribing; the subscribe command is sent once, after the
 // connection is established.
 func (s *Subscription) recreateChannel(oldName, newName string, recoverable bool, handler func(e centrifuge.PublicationEvent)) error {
+	if old := s.channels.Get(oldName); old != nil {
+		s.mu.Lock()
+		delete(s.confirmed, old)
+		s.mu.Unlock()
+	}
 	sub, err := s.channels.ReplaceSubscription(oldName, newName, recoverable, handler)
 	if err != nil {
 		return err
 	}
-	sub.OnUnsubscribed(s.channelUnsubscribedHandler(sub))
+	s.trackSubscription(sub)
 	if err := sub.Subscribe(); err != nil {
 		return fmt.Errorf("subscribe to %s: %w", newName, err)
 	}
@@ -564,7 +596,7 @@ func (s *Subscription) setupChannels() error {
 		if err != nil {
 			return err
 		}
-		sub.OnUnsubscribed(s.channelUnsubscribedHandler(sub))
+		s.trackSubscription(sub)
 		return nil
 	}
 

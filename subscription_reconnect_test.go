@@ -27,6 +27,7 @@ type testServer struct {
 	delay    time.Duration // how long the main channel OnSubscribe takes (JungleBus does a DB lookup)
 	reject   func(channel string) error
 	recovery bool // keep history and enable recovery on control and mempool channels
+	delayAll bool // apply delay to every channel's subscribe, not just the main channel
 
 	mu         sync.Mutex
 	subscribes map[string]int // subscribe commands that reached OnSubscribe, per channel
@@ -75,7 +76,7 @@ func newTestServer(t *testing.T, delay time.Duration) *testServer {
 					return
 				}
 			}
-			if isMainChannel(e.Channel) && ts.delay > 0 {
+			if (isMainChannel(e.Channel) || ts.delayAll) && ts.delay > 0 {
 				// Reply asynchronously, like a handler that does I/O first.
 				// centrifuge keeps reading commands meanwhile, so a duplicate
 				// subscribe is rejected before this one succeeds.
@@ -410,4 +411,52 @@ func TestReconnect_RecoversMempoolPublishedWhileDisconnected(t *testing.T) {
 	}
 	require.Same(t, controlBefore, sub.channels.Get(fmt.Sprintf("lite:%s:control", subID)),
 		"a healthy recoverable channel must keep its subscription (and recovery position) across reconnects")
+}
+
+// TestReconnect_WhileControlAndMempoolSubscribesPending is the pending-subscribe
+// case for the recoverable channels, which are kept across reconnects when
+// their subscribe had completed.
+func TestReconnect_WhileControlAndMempoolSubscribesPending(t *testing.T) {
+	ts := newTestServer(t, 500*time.Millisecond)
+	ts.delayAll = true
+	const subID = "pending-all-test"
+	control := fmt.Sprintf("lite:%s:control", subID)
+	mempoolChannel := fmt.Sprintf("lite:%s:mempool", subID)
+
+	client, err := New(WithHTTP(ts.host), WithToken("test-token"), WithSSL(false))
+	require.NoError(t, err)
+	mempool := make(chan *models.TransactionResponse, 100)
+	statuses := make(chan *models.ControlResponse, 100)
+	sub, err := client.SubscribeWithQueue(context.Background(), subID, 100, 0, EventHandler{
+		OnTransaction: func(*models.TransactionResponse) {},
+		OnMempool:     func(tx *models.TransactionResponse) { mempool <- tx },
+		OnStatus: func(st *models.ControlResponse) {
+			if st.StatusCode == uint32(SubscriptionBlockDone) {
+				statuses <- st
+			}
+		},
+		OnError: func(error) {},
+	}, &SubscribeOptions{QueueSize: 100, LiteMode: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sub.Unsubscribe() })
+
+	waitFor(t, 5*time.Second, "first subscribes", func() bool {
+		return ts.subscribeCount(control) == 1 && ts.subscribeCount(mempoolChannel) == 1
+	})
+	ts.forceReconnect() // replies to the first subscribes are still pending
+
+	waitFor(t, 10*time.Second, "channels resubscribed", func() bool {
+		return ts.subscribeCount(control) >= 2 && ts.subscribeCount(mempoolChannel) >= 2
+	})
+	time.Sleep(3 * ts.delay)
+	require.Zero(t, ts.duplicateCount(control), "control must not be subscribed twice on the same connection")
+	require.Zero(t, ts.duplicateCount(mempoolChannel), "mempool must not be subscribed twice on the same connection")
+
+	require.True(t, ts.publishUntilReceivedOn(mempoolChannel, "mempool-after", mempool, 5*time.Second))
+	ts.publish(control, &models.ControlResponse{StatusCode: uint32(SubscriptionBlockDone), Status: "block-done", Block: 100})
+	select {
+	case <-statuses:
+	case <-time.After(5 * time.Second):
+		t.Fatal("control channel not delivering after reconnecting during a pending subscribe")
+	}
 }

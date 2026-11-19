@@ -254,7 +254,7 @@ func TestReconnect_RecreatesUnsubscribedMainChannel(t *testing.T) {
 
 	select {
 	case err := <-errs:
-		require.Contains(t, err.Error(), "main channel")
+		require.Contains(t, err.Error(), mainChannel)
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected an error for the unsubscribed main channel")
 	}
@@ -315,4 +315,24 @@ func TestReconnect_UsesPositionAfterQueuedEvents(t *testing.T) {
 	waitFor(t, 10*time.Second, "subscribe on "+resumed, func() bool { return ts.subscribeCount(resumed) > 0 })
 	require.Zero(t, ts.subscribeCount(fmt.Sprintf("lite:%s:101:0", subID)), "must not resume from a position before queued block-done events")
 	require.True(t, ts.publishUntilReceived(resumed, "tx-after", received, 5*time.Second))
+}
+
+// TestReconnect_WhileMainSubscribePending disconnects while the main channel's
+// subscribe is still waiting for its reply. The pending request fails with the
+// old connection and may schedule a retry; that retry must not overlap the new
+// connection's resubscribe and subscribe the channel twice.
+func TestReconnect_WhileMainSubscribePending(t *testing.T) {
+	ts := newTestServer(t, 500*time.Millisecond)
+	const subID = "pending-test"
+	mainChannel := fmt.Sprintf("lite:%s:100:0", subID)
+
+	_, received, _ := newTestSubscription(t, ts, subID, 100)
+	waitFor(t, 5*time.Second, "first main subscribe", func() bool { return ts.subscribeCount(mainChannel) == 1 })
+	ts.forceReconnect() // the first subscribe's reply is still pending
+
+	waitFor(t, 10*time.Second, "main channel resubscribed", func() bool { return ts.subscribeCount(mainChannel) >= 2 })
+	time.Sleep(3 * ts.delay) // let any overlapping retry show up
+	require.Zero(t, ts.duplicateCount(mainChannel), "main channel must not be subscribed twice on the same connection")
+	require.True(t, ts.publishUntilReceived(mainChannel, "tx-after", received, 5*time.Second),
+		"transaction not delivered after reconnecting during a pending subscribe")
 }
